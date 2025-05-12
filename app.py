@@ -8,588 +8,1051 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 import networkx as nx
 import requests
 import json
 import warnings
+from PIL import Image
 import io
 import base64
-from faker import Faker  # For generating realistic sample data
+from faker import Faker
 
 # Configuration
 warnings.filterwarnings('ignore')
-plt.style.use('dark_background')
-sns.set_style('darkgrid')
+plt.style.use('fivethirtyeight')
+sns.set_style('whitegrid')
 pd.set_option('display.max_columns', None)
 
 # Set page config
 st.set_page_config(
-    page_title="CryptoInsight Pro",
-    page_icon="📊",
+    page_title="CryptoInsight Analytics",
+    page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for enhanced styling
-st.markdown("""
-    <style>
-    .stApp {
-        background-color: #0E1117;
-        color: #FFFFFF;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        background-color: #1E2130;
-        border-radius: 10px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        color: #FFFFFF;
-        background-color: transparent;
-        transition: all 0.3s ease;
-    }
-    .stTabs [data-baseweb="tab"]:hover {
-        background-color: #2C3040;
-    }
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        background-color: #4A5568;
-        color: #64B5F6;
-    }
-    .metric-card {
-        background-color: #1E2130;
-        border-radius: 10px;
-        padding: 15px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-        transition: transform 0.3s ease;
-    }
-    .metric-card:hover {
-        transform: scale(1.05);
-    }
-    .stMarkdown {
-        color: #E2E8F0;
-    }
-    .stDataFrame {
-        background-color: #1E2130 !important;
-    }
-    .stAlert {
-        background-color: #2C3040 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+# Custom CSS
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
-class AdvancedCryptoAnalyzer:
+# Load custom CSS
+local_css("style.css")
+
+# Constants
+BTC_COLOR = '#F7931A'
+ETH_COLOR = '#627EEA'
+DARK_BG = '#0E1117'
+PLOT_BG = '#1E1E1E'
+
+# Initialize Faker for demo data generation
+fake = Faker()
+
+class CryptoDataPreprocessor:
     def __init__(self, data):
-        self.original_data = data.copy()
-        self.processed_data = None
+        self.data = data.copy()
         self.btc_data = None
         self.eth_data = None
-        
-    def preprocess_data(self):
-    """Advanced data preprocessing with feature engineering"""
-    st.write("🔍 Performing advanced data preprocessing...")
-    
-    # Convert timestamp
-    self.processed_data = self.original_data.copy()
-    self.processed_data['Timestamp'] = pd.to_datetime(self.processed_data['Timestamp'])
-    
-    # Feature engineering
-    self.processed_data['Year'] = self.processed_data['Timestamp'].dt.year
-    self.processed_data['Month'] = self.processed_data['Timestamp'].dt.month
-    self.processed_data['Day'] = self.processed_data['Timestamp'].dt.day
-    self.processed_data['Hour'] = self.processed_data['Timestamp'].dt.hour
-    self.processed_data['DayOfWeek'] = self.processed_data['Timestamp'].dt.day_name()
-    self.processed_data['DayOfWeekNum'] = self.processed_data['Timestamp'].dt.dayofweek
-    
-    # Normalize transaction amount
-    scaler = MinMaxScaler()
-    self.processed_data['Normalized_Amount'] = scaler.fit_transform(
-        self.processed_data['Amount'].values.reshape(-1, 1)  # Fixed this line
-    )
-    
-    # Sentiment proxy (based on transaction size and frequency)
-    self.processed_data['Transaction_Sentiment'] = np.where(
-        self.processed_data['Normalized_Amount'] > 0.7, 'High Confidence',
-        np.where(self.processed_data['Normalized_Amount'] > 0.3, 'Moderate Confidence', 'Low Confidence')
-    )
-    
-    # Separate BTC and ETH data
-    self.btc_data = self.processed_data[self.processed_data['Currency'] == 'BTC']
-    self.eth_data = self.processed_data[self.processed_data['Currency'] == 'ETH']
-    
-    st.success("✅ Advanced preprocessing completed!")
-    return self.processed_data
-    
-    def advanced_clustering(self):
-        """Perform advanced clustering analysis"""
-        st.header("🌐 Advanced Transaction Clustering")
-        
-        # Prepare features for clustering
-        features = ['Amount', 'Transaction_Fee']
-        X = self.processed_data[features]
-        
-        # Normalize features
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
-        # Dimensionality reduction
-        pca = PCA(n_components=2)
-        X_pca = pca.fit_transform(X_scaled)
-        
-        # Clustering
-        kmeans = KMeans(n_clusters=4, random_state=42)
-        self.processed_data['Cluster'] = kmeans.fit_predict(X_scaled)
-        
-        # Visualization
-        fig = px.scatter(
-            x=X_pca[:, 0], 
-            y=X_pca[:, 1], 
-            color=self.processed_data['Cluster'].astype(str),
-            color_discrete_sequence=px.colors.qualitative.Pastel,
-            title='Transaction Clusters (PCA Visualization)',
-            labels={'x': 'First Principal Component', 'y': 'Second Principal Component'}
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Cluster characteristics
-        cluster_summary = self.processed_data.groupby('Cluster').agg({
-            'Amount': ['mean', 'median'],
-            'Transaction_Fee': ['mean', 'median'],
-            'Transaction_ID': 'count'
-        }).reset_index()
-        cluster_summary.columns = ['Cluster', 'Avg Amount', 'Median Amount', 'Avg Fee', 'Median Fee', 'Transaction Count']
-        
-        st.subheader("Cluster Characteristics")
-        st.dataframe(cluster_summary)
-        
-        return cluster_summary
-    
-    def predictive_risk_scoring(self):
-        """Create a basic predictive risk scoring mechanism"""
-        st.header("🎲 Transaction Risk Scoring")
-        
-        # Risk factors
-        self.processed_data['Risk_Score'] = (
-            (self.processed_data['Transaction_Fee'] / self.processed_data['Amount'] * 100) +  # Fee ratio
-            (self.processed_data['Normalized_Amount'] * 100) +  # Transaction size
-            (np.where(self.processed_data['Transaction_Status'] == 'Failed', 50, 0))  # Failed transaction penalty
-        
-        # Risk categorization
-        def categorize_risk(score):
-            if score < 10: return 'Low Risk'
-            elif score < 30: return 'Medium Risk'
-            else: return 'High Risk'
-        
-        self.processed_data['Risk_Category'] = self.processed_data['Risk_Score'].apply(categorize_risk)
-        
-        # Visualization
-        risk_dist = self.processed_data['Risk_Category'].value_counts().reset_index()
-        risk_dist.columns = ['Risk_Category', 'Count']
-        
-        fig = px.bar(
-            risk_dist,
-            x='Risk_Category', 
-            y='Count', 
-            title='Risk Distribution',
-            labels={'x': 'Risk Category', 'y': 'Number of Transactions'},
-            color='Risk_Category',
-            color_discrete_map={
-                'Low Risk': '#2ecc71',
-                'Medium Risk': '#f39c12',
-                'High Risk': '#e74c3c'
-            }
-        )
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Detailed risk insights
-        st.subheader("Risk Category Insights")
-        risk_insights = self.processed_data.groupby(['Currency', 'Risk_Category']).agg({
-            'Amount': ['mean', 'median'],
-            'Transaction_Fee': ['mean', 'median'],
-            'Transaction_ID': 'count'
-        }).reset_index()
-        risk_insights.columns = ['Currency', 'Risk_Category', 'Avg Amount', 'Median Amount', 'Avg Fee', 'Median Fee', 'Transaction Count']
-        st.dataframe(risk_insights)
-        
-        return self.processed_data, risk_insights
-    
-    def transaction_network_analysis(self):
-        """Analyze transaction network patterns"""
-        st.header("🕸️ Transaction Network Analysis")
-        
-        # Create a sample network (in a real app, you'd use actual sender/receiver data)
-        sample_size = min(100, len(self.processed_data))
-        sample_data = self.processed_data.sample(sample_size, random_state=42)
-        
-        G = nx.Graph()
-        
-        # Add nodes and edges
-        for _, row in sample_data.iterrows():
-            G.add_node(row['Sender_Address'], type='sender')
-            G.add_node(row['Receiver_Address'], type='receiver')
-            G.add_edge(row['Sender_Address'], row['Receiver_Address'], 
-                      amount=row['Amount'], currency=row['Currency'])
-        
-        # Calculate network metrics
-        degrees = dict(G.degree())
-        betweenness = nx.betweenness_centrality(G)
-        
-        # Create network visualization
-        pos = nx.spring_layout(G, seed=42)
-        
-        edge_x = []
-        edge_y = []
-        for edge in G.edges():
-            x0, y0 = pos[edge[0]]
-            x1, y1 = pos[edge[1]]
-            edge_x.extend([x0, x1, None])
-            edge_y.extend([y0, y1, None])
-        
-        edge_trace = go.Scatter(
-            x=edge_x, y=edge_y,
-            line=dict(width=0.5, color='#888'),
-            hoverinfo='none',
-            mode='lines')
-        
-        node_x = []
-        node_y = []
-        node_text = []
-        for node in G.nodes():
-            x, y = pos[node]
-            node_x.append(x)
-            node_y.append(y)
-            node_text.append(f"Address: {node[:10]}...<br>Degree: {degrees.get(node, 0)}")
-        
-        node_trace = go.Scatter(
-            x=node_x, y=node_y,
-            mode='markers',
-            hoverinfo='text',
-            text=node_text,
-            marker=dict(
-                showscale=True,
-                colorscale='YlGnBu',
-                size=10,
-                colorbar=dict(
-                    thickness=15,
-                    title='Node Connections',
-                    xanchor='left',
-                    titleside='right'
-                ),
-                line_width=2))
-        
-        fig = go.Figure(data=[edge_trace, node_trace],
-                     layout=go.Layout(
-                        title='Transaction Network Visualization',
-                        showlegend=False,
-                        hovermode='closest',
-                        margin=dict(b=20,l=5,r=5,t=40),
-                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False))
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Network statistics
-        st.subheader("Network Statistics")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Number of Nodes", G.number_of_nodes())
-        col2.metric("Number of Edges", G.number_of_edges())
-        col3.metric("Average Degree", f"{sum(degrees.values())/len(degrees):.2f}")
-        
-        return G
+        self.preprocessed = False
 
-def get_crypto_markets():
-    """Enhanced cryptocurrency market data fetcher"""
+    def preprocess(self):
+        """Clean and prepare the transaction data"""
+        with st.spinner('Preprocessing data...'):
+            # Convert timestamp to datetime
+            self.data['Timestamp'] = pd.to_datetime(self.data['Timestamp'])
+
+            # Create time-based features
+            self.data['Date'] = self.data['Timestamp'].dt.date
+            self.data['Hour'] = self.data['Timestamp'].dt.hour
+            self.data['Day_of_Week'] = self.data['Timestamp'].dt.day_name()
+            self.data['Day_of_Week_Num'] = self.data['Timestamp'].dt.dayofweek
+            self.data['Month'] = self.data['Timestamp'].dt.month_name()
+            self.data['Year'] = self.data['Timestamp'].dt.year
+
+            # Separate by currency
+            self.btc_data = self.data[self.data['Currency'] == 'BTC']
+            self.eth_data = self.data[self.data['Currency'] == 'ETH']
+
+            # Calculate fee percentage
+            self.data['Fee_Percentage'] = (self.data['Transaction_Fee'] / self.data['Amount']) * 100
+
+            # Ethereum-specific calculations
+            if 'Gas_Price_Gwei' in self.data.columns:
+                self.data['Gas_Cost_ETH'] = self.data['Gas_Price_Gwei'] * 1e-9 * 21000
+
+            # Calculate transaction size categories
+            self.data['Size_Category'] = pd.cut(
+                self.data['Amount'],
+                bins=[0, 0.1, 1, 10, 100, float('inf')],
+                labels=['<0.1', '0.1-1', '1-10', '10-100', '>100']
+            )
+
+            self.preprocessed = True
+        st.success('Data preprocessing completed!')
+        self._summarize_data()
+
+    def _summarize_data(self):
+        """Print dataset summary"""
+        with st.expander("📊 Dataset Summary", expanded=True):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("Total Transactions", f"{len(self.data):,}")
+                st.metric("BTC Transactions", f"{len(self.btc_data):,} ({len(self.btc_data)/len(self.data)*100:.1f}%)")
+                
+            with col2:
+                st.metric("Date Range", 
+                         f"{self.data['Timestamp'].min().date()} to {self.data['Timestamp'].max().date()}")
+                st.metric("ETH Transactions", f"{len(self.eth_data):,} ({len(self.eth_data)/len(self.data)*100:.1f}%)")
+                
+            with col3:
+                st.metric("Unique Senders", f"{self.data['Sender_Address'].nunique():,}")
+                st.metric("Unique Receivers", f"{self.data['Receiver_Address'].nunique():,}")
+
+            if 'Mining_Pool' in self.data.columns:
+                st.metric("Mining Pools", f"{self.data['Mining_Pool'].nunique()}")
+
+            # Transaction status and type distribution
+            st.subheader("Transaction Distribution")
+            dist_col1, dist_col2 = st.columns(2)
+            
+            with dist_col1:
+                st.write("**Transaction Status**")
+                status_dist = self.data['Transaction_Status'].value_counts(normalize=True)
+                fig = px.pie(status_dist, values=status_dist.values, names=status_dist.index,
+                            color_discrete_sequence=[BTC_COLOR, ETH_COLOR])
+                st.plotly_chart(fig, use_container_width=True)
+                
+            with dist_col2:
+                st.write("**Transaction Type**")
+                type_dist = self.data['Transaction_Type'].value_counts(normalize=True)
+                fig = px.pie(type_dist, values=type_dist.values, names=type_dist.index,
+                            color_discrete_sequence=[BTC_COLOR, ETH_COLOR])
+                st.plotly_chart(fig, use_container_width=True)
+
+            # Hourly transaction patterns
+            st.subheader("Hourly Transaction Patterns")
+            hourly_data = self.data.groupby(['Hour', 'Currency']).size().reset_index(name='Count')
+            fig = px.line(hourly_data, x='Hour', y='Count', color='Currency',
+                         title='Transactions by Hour of Day',
+                         color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR})
+            st.plotly_chart(fig, use_container_width=True)
+
+    def get_processed_data(self):
+        """Return processed datasets"""
+        if not self.preprocessed:
+            self.preprocess()
+        return self.data, self.btc_data, self.eth_data
+
+def get_crypto_prices():
+    """Fetch current cryptocurrency prices from CoinGecko API"""
+    url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=bitcoin,ethereum"
     try:
-        # Top 10 cryptocurrencies
-        top_crypto_url = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=10"
-        response = requests.get(top_crypto_url)
-        top_cryptos = response.json()
+        response = requests.get(url)
+        data = response.json()
+        btc_data = next(item for item in data if item["id"] == "bitcoin")
+        eth_data = next(item for item in data if item["id"] == "ethereum")
         
-        return top_cryptos
+        # Get historical data for charts
+        btc_history = requests.get("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=90&interval=daily").json()
+        eth_history = requests.get("https://api.coingecko.com/api/v3/coins/ethereum/market_chart?vs_currency=usd&days=90&interval=daily").json()
+        
+        return {
+            'BTC': {
+                'price': btc_data['current_price'],
+                'change_24h': btc_data['price_change_percentage_24h'],
+                'market_cap': btc_data['market_cap'],
+                'volume': btc_data['total_volume'],
+                'history': btc_history
+            },
+            'ETH': {
+                'price': eth_data['current_price'],
+                'change_24h': eth_data['price_change_percentage_24h'],
+                'market_cap': eth_data['market_cap'],
+                'volume': eth_data['total_volume'],
+                'history': eth_history
+            }
+        }
     except Exception as e:
-        st.error(f"Market data fetch error: {e}")
+        st.error(f"Error fetching crypto prices: {e}")
         return None
 
-def display_market_overview(top_cryptos):
-    """Display comprehensive market overview"""
-    st.header("📈 Global Cryptocurrency Market Overview")
+def generate_demo_data():
+    """Generate synthetic demo data if no file is uploaded"""
+    num_transactions = 5000
+    start_date = datetime.now() - timedelta(days=365)
+    end_date = datetime.now()
     
-    if not top_cryptos:
-        st.warning("Unable to fetch market data")
-        return
+    data = {
+        'Transaction_ID': [fake.uuid4() for _ in range(num_transactions)],
+        'Timestamp': [fake.date_time_between(start_date=start_date, end_date=end_date) for _ in range(num_transactions)],
+        'Sender_Address': [fake.sha256()[:34] for _ in range(num_transactions)],
+        'Receiver_Address': [fake.sha256()[:34] for _ in range(num_transactions)],
+        'Amount': np.random.exponential(0.5, num_transactions).round(6),
+        'Transaction_Fee': np.random.exponential(0.001, num_transactions).round(6),
+        'Currency': np.random.choice(['BTC', 'ETH'], num_transactions, p=[0.6, 0.4]),
+        'Transaction_Status': np.random.choice(['Confirmed', 'Pending', 'Failed'], num_transactions, p=[0.85, 0.1, 0.05]),
+        'Transaction_Type': np.random.choice(['Regular', 'Contract', 'Token'], num_transactions, p=[0.7, 0.2, 0.1]),
+        'Mining_Pool': np.random.choice(['AntPool', 'F2Pool', 'Poolin', 'ViaBTC', 'Unknown'], num_transactions),
+        'Gas_Price_Gwei': np.where(np.random.choice(['BTC', 'ETH'], num_transactions, p=[0.6, 0.4]) == 'ETH',
+                          np.random.normal(50, 15, num_transactions).clip(10, 200), np.nan)
+    }
     
-    # Create columns for top cryptocurrencies
-    columns = st.columns(5)
-    
-    for i, crypto in enumerate(top_cryptos[:5]):
-        with columns[i]:
-            st.markdown(f"""
-            <div class="metric-card">
-                <h4>{crypto['symbol'].upper()}</h4>
-                <p>Price: ${crypto['current_price']:,.2f}</p>
-                <p>24h Change: 
-                    <span style="color:{'green' if crypto['price_change_percentage_24h'] >= 0 else 'red'}">
-                        {crypto['price_change_percentage_24h']:.2f}%
-                    </span>
-                </p>
-                <p>Market Cap: ${crypto['market_cap']:,.0f}</p>
-            </div>
-            """, unsafe_allow_html=True)
+    return pd.DataFrame(data)
 
-def generate_sample_data():
-    """Generate realistic sample cryptocurrency transaction data"""
-    fake = Faker()
+def show_price_tab():
+    """Display current cryptocurrency prices and charts"""
+    st.header("💰 Live Market Data")
     
-    # Generate realistic timestamps
-    start_date = datetime(2023, 1, 1)
-    end_date = datetime(2023, 12, 31)
-    date_range = (end_date - start_date).days
-    random_dates = [start_date + timedelta(days=np.random.randint(date_range), 
-                                         hours=np.random.randint(24),
-                  minutes=np.random.randint(60)) for _ in range(1000)]
+    price_data = get_crypto_prices()
     
-    # Generate realistic amounts with different distributions for BTC and ETH
-    btc_amounts = np.random.lognormal(mean=2, sigma=1.5, size=500)
-    eth_amounts = np.random.lognormal(mean=1.5, sigma=1.2, size=500)
-    
-    sample_data = pd.DataFrame({
-        'Transaction_ID': [f'TX{fake.unique.random_number(digits=8)}' for _ in range(1000)],
-        'Timestamp': sorted(random_dates),
-        'Currency': np.random.choice(['BTC', 'ETH'], 1000, p=[0.6, 0.4]),
-        'Amount': np.concatenate([btc_amounts, eth_amounts]),
-        'Transaction_Fee': np.random.uniform(0.001, 0.1, 1000) * np.concatenate([btc_amounts, eth_amounts]),
-        'Sender_Address': [f'0x{fake.unique.sha256()[:40]}' for _ in range(1000)],
-        'Receiver_Address': [f'0x{fake.unique.sha256()[:40]}' for _ in range(1000)],
-        'Transaction_Status': np.random.choice(['Success', 'Failed'], 1000, p=[0.95, 0.05])
-    })
-    
-    # Make some transactions between the same addresses
-    for _ in range(50):
-        idx = np.random.randint(0, 1000)
-        sample_data.at[idx, 'Receiver_Address'] = sample_data.at[idx, 'Sender_Address']
-    
-    return sample_data
+    if price_data:
+        # Price cards
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            btc_change_color = "green" if price_data['BTC']['change_24h'] >= 0 else "red"
+            st.metric(
+                "Bitcoin (BTC)", 
+                f"${price_data['BTC']['price']:,.2f}", 
+                f"{price_data['BTC']['change_24h']:.2f}%",
+                delta_color="normal"
+            )
+            st.caption(f"Market Cap: ${price_data['BTC']['market_cap']/1e9:,.1f}B")
+            st.caption(f"24h Volume: ${price_data['BTC']['volume']/1e9:,.1f}B")
+            
+        with col2:
+            eth_change_color = "green" if price_data['ETH']['change_24h'] >= 0 else "red"
+            st.metric(
+                "Ethereum (ETH)", 
+                f"${price_data['ETH']['price']:,.2f}", 
+                f"{price_data['ETH']['change_24h']:.2f}%",
+                delta_color="normal"
+            )
+            st.caption(f"Market Cap: ${price_data['ETH']['market_cap']/1e9:,.1f}B")
+            st.caption(f"24h Volume: ${price_data['ETH']['volume']/1e9:,.1f}B")
+        
+        # Price charts
+        st.subheader("90-Day Price History")
+        tab1, tab2, tab3 = st.tabs(["Combined View", "Bitcoin", "Ethereum"])
+        
+        with tab1:
+            # Process BTC data
+            btc_dates = [datetime.fromtimestamp(x[0]/1000) for x in price_data['BTC']['history']['prices']]
+            btc_prices = [x[1] for x in price_data['BTC']['history']['prices']]
+            btc_df = pd.DataFrame({'Date': btc_dates, 'Price': btc_prices, 'Currency': 'BTC'})
+            
+            # Process ETH data
+            eth_dates = [datetime.fromtimestamp(x[0]/1000) for x in price_data['ETH']['history']['prices']]
+            eth_prices = [x[1] for x in price_data['ETH']['history']['prices']]
+            eth_df = pd.DataFrame({'Date': eth_dates, 'Price': eth_prices, 'Currency': 'ETH'})
+            
+            # Combine data
+            combined_df = pd.concat([btc_df, eth_df])
+            
+            # Plot
+            fig = px.line(combined_df, x='Date', y='Price', color='Currency', 
+                         title='Bitcoin vs Ethereum Price History',
+                         color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                         template='plotly_dark')
+            fig.update_layout(
+                hovermode='x unified',
+                yaxis_title="Price (USD)",
+                xaxis_title="Date",
+                plot_bgcolor=PLOT_BG,
+                paper_bgcolor=DARK_BG
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with tab2:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=btc_dates, y=btc_prices,
+                name='BTC Price',
+                line=dict(color=BTC_COLOR, width=2),
+                fill='tozeroy',
+                fillcolor=f'rgba(247, 147, 26, 0.2)'
+            ))
+            fig.update_layout(
+                title='Bitcoin Price History',
+                yaxis_title="Price (USD)",
+                xaxis_title="Date",
+                template='plotly_dark',
+                plot_bgcolor=PLOT_BG,
+                paper_bgcolor=DARK_BG
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with tab3:
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=eth_dates, y=eth_prices,
+                name='ETH Price',
+                line=dict(color=ETH_COLOR, width=2),
+                fill='tozeroy',
+                fillcolor=f'rgba(98, 126, 234, 0.2)'
+            ))
+            fig.update_layout(
+                title='Ethereum Price History',
+                yaxis_title="Price (USD)",
+                xaxis_title="Date",
+                template='plotly_dark',
+                plot_bgcolor=PLOT_BG,
+                paper_bgcolor=DARK_BG
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        # Market indicators
+        st.subheader("Market Indicators")
+        indicator_col1, indicator_col2, indicator_col3 = st.columns(3)
+        
+        with indicator_col1:
+            st.plotly_chart(create_market_indicator(
+                "Fear & Greed Index", 
+                np.random.randint(0, 100), 
+                "https://alternative.me/crypto/fear-and-greed-index.png"
+            ), use_container_width=True)
+        
+        with indicator_col2:
+            st.plotly_chart(create_market_indicator(
+                "BTC Dominance", 
+                np.random.uniform(40, 50), 
+                ""
+            ), use_container_width=True)
+        
+        with indicator_col3:
+            st.plotly_chart(create_market_indicator(
+                "ETH Gas Price", 
+                np.random.uniform(20, 100), 
+                ""
+            ), use_container_width=True)
+    else:
+        st.warning("Could not fetch cryptocurrency prices. Please try again later.")
 
-def display_transaction_trends(processed_data):
-    """Display transaction trends by hour and day"""
-    st.subheader("Transaction Trends by Time")
+def create_market_indicator(title, value, image_url):
+    """Create a market indicator gauge chart"""
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=value,
+        title={'text': title},
+        gauge={
+            'axis': {'range': [None, 100]},
+            'bar': {'color': BTC_COLOR if "BTC" in title else ETH_COLOR},
+            'steps': [
+                {'range': [0, 30], 'color': "red"},
+                {'range': [30, 70], 'color': "yellow"},
+                {'range': [70, 100], 'color': "green"}
+            ]
+        }
+    ))
+    fig.update_layout(
+        height=250,
+        margin=dict(l=20, r=20, t=50, b=20),
+        paper_bgcolor=DARK_BG
+    )
+    return fig
+
+def analyze_mining_pools(data):
+    """Analyze mining pool activity"""
+    st.header("⛏️ Mining Pool Analysis")
     
-    # Create tabs for different time aggregations
-    tab1, tab2 = st.tabs(["By Hour", "By Day of Week"])
+    if 'Mining_Pool' not in data.columns:
+        st.warning("No mining pool data available in this dataset")
+        return None, None
+
+    # Pool statistics
+    pool_counts = data.groupby(['Mining_Pool', 'Currency']).agg(
+        Transaction_Count=('Transaction_ID', 'count'),
+        Total_Amount=('Amount', 'sum'),
+        Avg_Fee=('Transaction_Fee', 'mean'),
+        Avg_Amount=('Amount', 'mean')
+    ).reset_index()
+
+    # Top pools selection
+    top_n = st.slider("Select number of top pools to display", 5, 20, 10)
+
+    # Visualizations
+    st.subheader(f"Top {top_n} Mining Pools by Transaction Count")
+    top_pools = pool_counts.sort_values('Transaction_Count', ascending=False).head(top_n)
+    
+    fig = px.bar(top_pools, x='Mining_Pool', y='Transaction_Count', color='Currency',
+                color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Mining Pool",
+        yaxis_title="Transaction Count",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Mining Pool Activity Composition")
+    pool_composition = pool_counts.sort_values('Transaction_Count', ascending=False).head(top_n)
+    fig = px.sunburst(pool_composition, path=['Currency', 'Mining_Pool'], values='Transaction_Count',
+                     color='Currency', color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR})
+    fig.update_layout(
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Average Fees by Mining Pool")
+    fig = px.box(pool_counts, x='Mining_Pool', y='Avg_Fee', color='Currency',
+                color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Mining Pool",
+        yaxis_title="Average Fee",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.subheader("Transaction Size vs Fee Relationship")
+    fig = px.scatter(pool_counts, x='Avg_Amount', y='Avg_Fee', color='Currency',
+                    size='Transaction_Count', hover_name='Mining_Pool',
+                    color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                    template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Average Transaction Amount",
+        yaxis_title="Average Fee",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    return pool_counts
+
+def analyze_transaction_fees(data):
+    """Analyze fee patterns"""
+    st.header("💸 Transaction Fee Analysis")
+
+    # Fee statistics
+    fee_stats = data.groupby('Currency')['Transaction_Fee'].agg([
+        'count', 'mean', 'median', 'min', 'max', 'std', 'sum'
+    ]).reset_index()
+
+    st.subheader("Fee Statistics")
+    st.dataframe(fee_stats.style.format({
+        'mean': '{:.6f}',
+        'median': '{:.6f}',
+        'std': '{:.6f}',
+        'sum': '{:.6f}'
+    }).background_gradient(cmap='YlOrBr'), use_container_width=True)
+
+    # Time-based fee analysis
+    st.subheader("Fee Trends Over Time")
+    time_resolution = st.radio("Select time resolution", ['Daily', 'Weekly', 'Monthly'], horizontal=True)
+    
+    if time_resolution == 'Daily':
+        fee_trends = data.groupby(['Date', 'Currency'])['Transaction_Fee'].mean().reset_index()
+    elif time_resolution == 'Weekly':
+        data['Week'] = data['Timestamp'].dt.to_period('W').dt.start_time
+        fee_trends = data.groupby(['Week', 'Currency'])['Transaction_Fee'].mean().reset_index()
+    else:  # Monthly
+        data['Month'] = data['Timestamp'].dt.to_period('M').dt.start_time
+        fee_trends = data.groupby(['Month', 'Currency'])['Transaction_Fee'].mean().reset_index()
+
+    fig = px.line(fee_trends, x=fee_trends.columns[0], y='Transaction_Fee', color='Currency',
+                 color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                 template='plotly_dark')
+    fig.update_layout(
+        xaxis_title=time_resolution,
+        yaxis_title="Average Fee",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Fee distribution
+    st.subheader("Fee Distribution Analysis")
+    dist_col1, dist_col2 = st.columns(2)
+    
+    with dist_col1:
+        fig = px.histogram(data, x='Transaction_Fee', color='Currency',
+                          marginal='box', nbins=50,
+                          color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                          template='plotly_dark')
+        fig.update_layout(
+            xaxis_title="Transaction Fee",
+            yaxis_title="Count",
+            plot_bgcolor=PLOT_BG,
+            paper_bgcolor=DARK_BG,
+            barmode='overlay'
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with dist_col2:
+        fig = px.box(data, x='Currency', y='Transaction_Fee', color='Currency',
+                    color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                    template='plotly_dark')
+        fig.update_layout(
+            xaxis_title="Currency",
+            yaxis_title="Transaction Fee",
+            plot_bgcolor=PLOT_BG,
+            paper_bgcolor=DARK_BG,
+            showlegend=False
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Fee vs Amount
+    st.subheader("Fee vs Transaction Amount")
+    sample_size = st.slider("Sample size for scatter plot", 100, 5000, 1000)
+    sampled_data = data.sample(min(sample_size, len(data)), random_state=42)
+    
+    fig = px.scatter(sampled_data, x='Amount', y='Transaction_Fee', color='Currency',
+                    trendline='lowess', opacity=0.5,
+                    color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                    template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Transaction Amount",
+        yaxis_title="Transaction Fee",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Ethereum gas analysis
+    if 'Gas_Price_Gwei' in data.columns:
+        st.subheader("Ethereum Gas Analysis")
+        eth_data = data[data['Currency'] == 'ETH'].copy()
+        
+        tab1, tab2 = st.tabs(["Gas Price Trends", "Gas Statistics"])
+        
+        with tab1:
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                               subplot_titles=('Gas Price Over Time', 'Daily Gas Price Distribution'))
+            
+            # Time series
+            daily_gas = eth_data.groupby('Date')['Gas_Price_Gwei'].mean().reset_index()
+            fig.add_trace(go.Scatter(
+                x=daily_gas['Date'], y=daily_gas['Gas_Price_Gwei'],
+                name='Avg Gas Price',
+                line=dict(color=ETH_COLOR, width=2)
+            ), row=1, col=1)
+            
+            # Hourly distribution
+            hourly_gas = eth_data.groupby('Hour')['Gas_Price_Gwei'].mean().reset_index()
+            fig.add_trace(go.Bar(
+                x=hourly_gas['Hour'], y=hourly_gas['Gas_Price_Gwei'],
+                name='Hourly Avg',
+                marker_color=ETH_COLOR
+            ), row=2, col=1)
+            
+            fig.update_layout(
+                height=600,
+                plot_bgcolor=PLOT_BG,
+                paper_bgcolor=DARK_BG,
+                showlegend=False
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with tab2:
+            gas_stats = eth_data['Gas_Price_Gwei'].describe().to_frame().T
+            st.dataframe(gas_stats.style.format('{:.2f}').background_gradient(cmap='Blues'), 
+                        use_container_width=True)
+            
+            fig = px.violin(eth_data, y='Gas_Price_Gwei', box=True, points="all",
+                           template='plotly_dark')
+            fig.update_layout(
+                yaxis_title="Gas Price (Gwei)",
+                plot_bgcolor=PLOT_BG,
+                paper_bgcolor=DARK_BG
+            )
+            st.plotly_chart(fig, use_container_width=True)
+
+    return fee_stats
+
+def analyze_address_activity(data):
+    """Analyze address patterns"""
+    st.header("📨 Address Activity Analysis")
+    
+    top_n = st.slider("Select number of top addresses to display", 5, 50, 10)
+
+    # Top senders
+    st.subheader(f"Top {top_n} Active Addresses")
+    tab1, tab2 = st.tabs(["Senders", "Receivers"])
     
     with tab1:
-        # Transactions by hour
-        hourly_data = processed_data.groupby(['Hour', 'Currency']).size().reset_index(name='Count')
-        fig = px.line(
-            hourly_data, 
-            x='Hour', 
-            y='Count', 
-            color='Currency',
-            title='Transaction Volume by Hour of Day',
-            labels={'Hour': 'Hour of Day', 'Count': 'Transaction Count'}
+        top_senders = data.groupby(['Sender_Address', 'Currency']).agg(
+            Transaction_Count=('Transaction_ID', 'count'),
+            Total_Sent=('Amount', 'sum'),
+            Avg_Amount=('Amount', 'mean')
+        ).sort_values('Transaction_Count', ascending=False).head(top_n)
+        
+        fig = px.bar(top_senders.reset_index(), x='Sender_Address', y='Transaction_Count',
+                    color='Currency', text='Transaction_Count',
+                    color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                    template='plotly_dark')
+        fig.update_layout(
+            xaxis_title="Sender Address",
+            yaxis_title="Transaction Count",
+            plot_bgcolor=PLOT_BG,
+            paper_bgcolor=DARK_BG,
+            xaxis_tickangle=45
         )
-        fig.update_xaxes(tickvals=list(range(24)))
         st.plotly_chart(fig, use_container_width=True)
+        
+        st.dataframe(top_senders.style.format({
+            'Total_Sent': '{:.6f}',
+            'Avg_Amount': '{:.6f}'
+        }).background_gradient(cmap='Oranges'), use_container_width=True)
     
     with tab2:
-        # Transactions by day of week
-        day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        daily_data = processed_data.groupby(['DayOfWeek', 'Currency']).size().reset_index(name='Count')
-        daily_data['DayOfWeek'] = pd.Categorical(daily_data['DayOfWeek'], categories=day_order, ordered=True)
-        daily_data = daily_data.sort_values('DayOfWeek')
+        top_receivers = data.groupby(['Receiver_Address', 'Currency']).agg(
+            Transaction_Count=('Transaction_ID', 'count'),
+            Total_Received=('Amount', 'sum'),
+            Avg_Amount=('Amount', 'mean')
+        ).sort_values('Transaction_Count', ascending=False).head(top_n)
         
-        fig = px.line(
-            daily_data, 
-            x='DayOfWeek', 
-            y='Count', 
-            color='Currency',
-            title='Transaction Volume by Day of Week',
-            labels={'DayOfWeek': 'Day of Week', 'Count': 'Transaction Count'}
+        fig = px.bar(top_receivers.reset_index(), x='Receiver_Address', y='Transaction_Count',
+                    color='Currency', text='Transaction_Count',
+                    color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                    template='plotly_dark')
+        fig.update_layout(
+            xaxis_title="Receiver Address",
+            yaxis_title="Transaction Count",
+            plot_bgcolor=PLOT_BG,
+            paper_bgcolor=DARK_BG,
+            xaxis_tickangle=45
         )
         st.plotly_chart(fig, use_container_width=True)
+        
+        st.dataframe(top_receivers.style.format({
+            'Total_Received': '{:.6f}',
+            'Avg_Amount': '{:.6f}'
+        }).background_gradient(cmap='Blues'), use_container_width=True)
 
-def display_whale_alert(processed_data):
-    """Identify and display large transactions (whale alerts)"""
-    st.header("🐋 Whale Alert: Large Transactions")
+    # Network analysis
+    st.subheader("Transaction Network Analysis")
+    sample_size = st.slider("Select sample size for network analysis", 100, 5000, 1000, step=100)
+    sample_data = data.sample(min(sample_size, len(data)), random_state=42)
     
-    # Define whale transactions (top 1% by amount)
-    threshold = processed_data['Amount'].quantile(0.99)
-    whale_txs = processed_data[processed_data['Amount'] >= threshold].sort_values('Amount', ascending=False)
+    with st.spinner('Building transaction network...'):
+        G = nx.from_pandas_edgelist(sample_data, 'Sender_Address', 'Receiver_Address',
+                                   edge_attr=['Amount', 'Currency'],
+                                   create_using=nx.DiGraph())
+
+        # Network metrics
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Nodes", f"{G.number_of_nodes():,}")
+        col2.metric("Edges", f"{G.number_of_edges():,}")
+        col3.metric("Density", f"{nx.density(G):.6f}")
+        col4.metric("Avg. Degree", f"{sum(dict(G.degree()).values())/G.number_of_nodes():.2f}")
+
+        # Centrality measures
+        st.write("**Top Central Addresses**")
+        centrality_type = st.selectbox("Select centrality measure", 
+                                      ['Degree', 'Betweenness', 'Closeness', 'Eigenvector'])
+        
+        if centrality_type == 'Degree':
+            centrality = nx.degree_centrality(G)
+        elif centrality_type == 'Betweenness':
+            centrality = nx.betweenness_centrality(G)
+        elif centrality_type == 'Closeness':
+            centrality = nx.closeness_centrality(G)
+        else:  # Eigenvector
+            centrality = nx.eigenvector_centrality(G)
+        
+        top_central = sorted(centrality.items(), key=lambda x: x[1], reverse=True)[:10]
+        top_central_df = pd.DataFrame(top_central, columns=['Address', centrality_type])
+        st.dataframe(top_central_df.style.format({centrality_type: '{:.4f}'}), 
+                     use_container_width=True)
+
+        # Simple network visualization
+        st.write("**Network Visualization** (showing first 50 nodes for performance)")
+        G_small = G.subgraph(list(G.nodes())[:50])
+        
+        fig, ax = plt.subplots(figsize=(10, 8))
+        pos = nx.spring_layout(G_small)
+        
+        # Color nodes by currency if possible
+        node_colors = []
+        for node in G_small.nodes():
+            # Try to find the node in either sender or receiver data
+            if node in sample_data['Sender_Address'].values:
+                currency = sample_data[sample_data['Sender_Address'] == node]['Currency'].iloc[0]
+            elif node in sample_data['Receiver_Address'].values:
+                currency = sample_data[sample_data['Receiver_Address'] == node]['Currency'].iloc[0]
+            else:
+                currency = 'BTC'  # Default
+            
+            node_colors.append(BTC_COLOR if currency == 'BTC' else ETH_COLOR)
+        
+        nx.draw(G_small, pos, with_labels=False, node_size=50, 
+               node_color=node_colors, alpha=0.8, ax=ax)
+        ax.set_facecolor(DARK_BG)
+        fig.patch.set_facecolor(DARK_BG)
+        st.pyplot(fig)
+
+    return top_senders, top_receivers, G
+
+def detect_temporal_patterns(data):
+    """Analyze time patterns and anomalies"""
+    st.header("⏱️ Temporal Patterns Analysis")
+
+    # Time resolution selection
+    time_resolution = st.radio("Select time resolution", 
+                              ['Hourly', 'Daily', 'Weekly', 'Monthly'], 
+                              horizontal=True)
+
+    # Prepare data based on resolution
+    if time_resolution == 'Hourly':
+        time_data = data.groupby(['Hour', 'Currency']).size().reset_index(name='Count')
+        x_col = 'Hour'
+    elif time_resolution == 'Daily':
+        time_data = data.groupby(['Date', 'Currency']).size().reset_index(name='Count')
+        x_col = 'Date'
+    elif time_resolution == 'Weekly':
+        data['Week'] = data['Timestamp'].dt.to_period('W').dt.start_time
+        time_data = data.groupby(['Week', 'Currency']).size().reset_index(name='Count')
+        x_col = 'Week'
+    else:  # Monthly
+        data['Month'] = data['Timestamp'].dt.to_period('M').dt.start_time
+        time_data = data.groupby(['Month', 'Currency']).size().reset_index(name='Count')
+        x_col = 'Month'
+
+    # Time patterns visualization
+    st.subheader(f"Transaction Volume by {time_resolution}")
+    fig = px.line(time_data, x=x_col, y='Count', color='Currency',
+                 color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                 template='plotly_dark')
+    fig.update_layout(
+        xaxis_title=time_resolution,
+        yaxis_title="Transaction Count",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Day of week analysis
+    st.subheader("Day of Week Patterns")
+    day_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+    daily_pattern = data.groupby(['Day_of_Week', 'Currency']).size().reset_index(name='Count')
+    daily_pattern['Day_Index'] = daily_pattern['Day_of_Week'].apply(lambda x: day_order.index(x))
+    daily_pattern = daily_pattern.sort_values('Day_Index')
+
+    fig = px.bar(daily_pattern, x='Day_of_Week', y='Count', color='Currency',
+                category_orders={'Day_of_Week': day_order},
+                color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                barmode='group',
+                template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Day of Week",
+        yaxis_title="Transaction Count",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Anomaly detection
+    st.subheader("Anomaly Detection")
+    z_threshold = st.slider("Select Z-score threshold for anomalies", 2.0, 5.0, 3.0, 0.5)
     
-    if len(whale_txs) > 0:
-        st.warning(f"🚨 Detected {len(whale_txs)} large transactions (top 1%)")
+    data['Amount_ZScore'] = data.groupby('Currency')['Amount'].transform(
+        lambda x: (x - x.mean()) / x.std())
+
+    anomalies = data[abs(data['Amount_ZScore']) > z_threshold].copy()
+
+    if not anomalies.empty:
+        st.warning(f"⚠️ Detected {len(anomalies)} anomalies (Z-score > {z_threshold})")
         
-        # Display top whale transactions
-        cols = st.columns(4)
-        cols[0].metric("Threshold Amount", f"{threshold:,.2f}")
-        cols[1].metric("Largest Transaction", f"{whale_txs['Amount'].max():,.2f}")
-        cols[2].metric("Average Whale TX", f"{whale_txs['Amount'].mean():,.2f}")
-        cols[3].metric("Total Whale Volume", f"{whale_txs['Amount'].sum():,.2f}")
+        col1, col2 = st.columns(2)
         
-        # Show detailed table
-        st.dataframe(whale_txs[['Timestamp', 'Currency', 'Amount', 'Sender_Address', 'Receiver_Address']])
+        with col1:
+            st.write("**Anomalies by Currency**")
+            anomaly_dist = anomalies['Currency'].value_counts()
+            fig = px.pie(anomaly_dist, values=anomaly_dist.values, names=anomaly_dist.index,
+                        color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                        template='plotly_dark')
+            st.plotly_chart(fig, use_container_width=True)
         
-        # Visualization of whale transactions over time
-        fig = px.scatter(
-            whale_txs,
-            x='Timestamp',
-            y='Amount',
-            color='Currency',
-            size='Amount',
-            hover_data=['Sender_Address', 'Receiver_Address'],
-            title='Large Transactions Over Time'
+        with col2:
+            st.write("**Anomalies Over Time**")
+            fig = px.scatter(anomalies, x='Timestamp', y='Amount', color='Currency',
+                            size='Amount_ZScore', hover_data=['Amount_ZScore'],
+                            color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                            template='plotly_dark')
+            fig.update_layout(
+                xaxis_title="Timestamp",
+                yaxis_title="Amount",
+                plot_bgcolor=PLOT_BG,
+                paper_bgcolor=DARK_BG
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        st.write("**Anomaly Details**")
+        st.dataframe(anomalies.sort_values('Amount_ZScore', ascending=False).head(10), 
+                     use_container_width=True)
+    else:
+        st.info(f"No anomalies detected with Z-score > {z_threshold}")
+
+    return daily_pattern, anomalies
+
+def show_data_overview(data):
+    """Display an overview of the transaction data"""
+    st.header("📊 Transaction Data Overview")
+    
+    # Basic statistics
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("Total Transactions", f"{len(data):,}")
+        st.metric("Total BTC Volume", f"{data[data['Currency'] == 'BTC']['Amount'].sum():.2f} BTC")
+    
+    with col2:
+        st.metric("Date Range", f"{data['Timestamp'].min().date()} to {data['Timestamp'].max().date()}")
+        st.metric("Total ETH Volume", f"{data[data['Currency'] == 'ETH']['Amount'].sum():.2f} ETH")
+    
+    with col3:
+        st.metric("Unique Addresses", f"{len(set(data['Sender_Address']) | set(data['Receiver_Address'])):,}")
+        st.metric("Average Transaction Amount", f"{data['Amount'].mean():.4f}")
+    
+    # Transaction currency breakdown
+    st.subheader("Transaction Currency Distribution")
+    currency_dist = data['Currency'].value_counts()
+    fig = px.pie(currency_dist, values=currency_dist.values, names=currency_dist.index,
+                color_discrete_sequence=[BTC_COLOR, ETH_COLOR],
+                template='plotly_dark')
+    fig.update_layout(
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Transaction type breakdown
+    st.subheader("Transaction Type & Status")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        type_dist = data['Transaction_Type'].value_counts()
+        fig = px.bar(type_dist, x=type_dist.index, y=type_dist.values,
+                    color=type_dist.index,
+                    template='plotly_dark')
+        fig.update_layout(
+            xaxis_title="Transaction Type",
+            yaxis_title="Count",
+            plot_bgcolor=PLOT_BG,
+            paper_bgcolor=DARK_BG,
+            showlegend=False
         )
         st.plotly_chart(fig, use_container_width=True)
+    
+    with col2:
+        status_dist = data['Transaction_Status'].value_counts()
+        fig = px.bar(status_dist, x=status_dist.index, y=status_dist.values,
+                    color=status_dist.index,
+                    template='plotly_dark')
+        fig.update_layout(
+            xaxis_title="Transaction Status",
+            yaxis_title="Count",
+            plot_bgcolor=PLOT_BG,
+            paper_bgcolor=DARK_BG,
+            showlegend=False
+        )
+        st.plotly_chart(fig, use_container_width=True)
+    
+    # Transaction volume over time
+    st.subheader("Transaction Volume Over Time")
+    time_resolution = st.radio("Select time resolution for volume chart", 
+                              ['Daily', 'Weekly', 'Monthly'], 
+                              horizontal=True)
+    
+    if time_resolution == 'Daily':
+        volume_data = data.groupby(['Date', 'Currency'])['Amount'].sum().reset_index()
+        x_col = 'Date'
+    elif time_resolution == 'Weekly':
+        data['Week'] = data['Timestamp'].dt.to_period('W').dt.start_time
+        volume_data = data.groupby(['Week', 'Currency'])['Amount'].sum().reset_index()
+        x_col = 'Week'
+    else:  # Monthly
+        data['Month'] = data['Timestamp'].dt.to_period('M').dt.start_time
+        volume_data = data.groupby(['Month', 'Currency'])['Amount'].sum().reset_index()
+        x_col = 'Month'
+    
+    fig = px.area(volume_data, x=x_col, y='Amount', color='Currency',
+                 color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                 template='plotly_dark')
+    fig.update_layout(
+        xaxis_title=time_resolution,
+        yaxis_title="Transaction Volume",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Transaction size distribution
+    st.subheader("Transaction Size Distribution")
+    show_outliers = st.checkbox("Show Outliers", value=False)
+    
+    if not show_outliers:
+        # Remove outliers for better visualization
+        q1 = data['Amount'].quantile(0.01)
+        q3 = data['Amount'].quantile(0.99)
+        filtered_data = data[(data['Amount'] >= q1) & (data['Amount'] <= q3)]
     else:
-        st.info("No whale transactions detected in this dataset")
+        filtered_data = data
+        
+    fig = px.histogram(filtered_data, x='Amount', color='Currency',
+                      nbins=50, marginal='box',
+                      color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                      template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Transaction Amount",
+        yaxis_title="Count",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Transaction size categories
+    st.subheader("Transaction Size Categories")
+    size_dist = data.groupby(['Size_Category', 'Currency']).size().reset_index(name='Count')
+    
+    fig = px.bar(size_dist, x='Size_Category', y='Count', color='Currency',
+                barmode='group',
+                category_orders={'Size_Category': ['<0.1', '0.1-1', '1-10', '10-100', '>100']},
+                color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Transaction Size",
+        yaxis_title="Count",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Hourly transaction patterns
+    st.subheader("Hourly Transaction Patterns")
+    hourly_data = data.groupby(['Hour', 'Currency']).size().reset_index(name='Count')
+    
+    fig = px.line(hourly_data, x='Hour', y='Count', color='Currency',
+                 color_discrete_map={'BTC': BTC_COLOR, 'ETH': ETH_COLOR},
+                 template='plotly_dark')
+    fig.update_layout(
+        xaxis_title="Hour of Day",
+        yaxis_title="Transaction Count",
+        plot_bgcolor=PLOT_BG,
+        paper_bgcolor=DARK_BG
+    )
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Raw data sample
+    with st.expander("View Sample Data"):
+        sample_size = st.slider("Select sample size", 5, 100, 20)
+        st.dataframe(data.sample(sample_size), use_container_width=True)
+    
+    return volume_data, size_dist
 
 def main():
-    """Enhanced main function for CryptoInsight Pro"""
-    st.title("🚀 CryptoInsight Pro: Advanced Transaction Analytics")
+    """Main function for CryptoInsight Analytics application"""
+    # Logo and title
+    st.sidebar.image("https://img.icons8.com/nolan/64/blockchain-technology.png", width=80)
+    st.sidebar.title("CryptoInsight Analytics")
+    st.sidebar.markdown("---")
     
-    # Sidebar for file upload and market overview
-    st.sidebar.image('https://via.placeholder.com/150?text=CryptoInsight+Pro', width=200)
-    st.sidebar.header("Market Overview")
-    top_cryptos = get_crypto_markets()
-    if top_cryptos:
-        display_market_overview(top_cryptos)
+    # Data input selection
+    data_option = st.sidebar.radio(
+        "Select Data Source",
+        ["Demo Data", "Upload CSV"]
+    )
+
+    if data_option == "Upload CSV":
+        uploaded_file = st.sidebar.file_uploader("Upload transaction data (CSV)", type=["csv"])
+        if uploaded_file is not None:
+            try:
+                data = pd.read_csv(uploaded_file)
+                st.sidebar.success("✅ File uploaded successfully!")
+            except Exception as e:
+                st.sidebar.error(f"Error: {e}")
+                data = generate_demo_data()
+                st.sidebar.warning("⚠️ Using demo data instead.")
+        else:
+            data = generate_demo_data()
+            st.sidebar.info("ℹ️ Using demo data for preview.")
+    else:
+        data = generate_demo_data()
+        st.sidebar.info("ℹ️ Using generated demo data.")
+
+    # Preprocess data
+    preprocessor = CryptoDataPreprocessor(data)
+    data, btc_data, eth_data = preprocessor.get_processed_data()
+
+    # Navigation
+    st.sidebar.markdown("---")
+    st.sidebar.title("Navigation")
+    page = st.sidebar.radio(
+        "Choose Analysis",
+        ["Market Overview", "Transaction Overview", "Fee Analysis", 
+         "Address Analysis", "Mining Pool Analysis", "Temporal Patterns"]
+    )
+
+    # Filter options
+    st.sidebar.markdown("---")
+    st.sidebar.title("Filters")
     
-    # File upload
-    uploaded_file = st.sidebar.file_uploader(
-        "Upload Cryptocurrency Transaction Data", 
-        type=["csv", "xlsx"], 
-        help="Upload a CSV or Excel file with cryptocurrency transaction data"
+    # Date filter
+    min_date = data['Timestamp'].min().date()
+    max_date = data['Timestamp'].max().date()
+    date_range = st.sidebar.date_input(
+        "Date Range",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date
     )
     
-    # Add some sample data options
-    if st.sidebar.checkbox("Use Sample Data", help="Generate realistic sample data for demonstration"):
-        sample_data = generate_sample_data()
-        uploaded_file = io.BytesIO(sample_data.to_csv(index=False).encode())
-        st.sidebar.success("Realistic sample data generated!")
+    # Currency filter
+    currencies = st.sidebar.multiselect(
+        "Currencies",
+        options=["BTC", "ETH"],
+        default=["BTC", "ETH"]
+    )
     
-    if uploaded_file is not None:
-        try:
-            # Read the uploaded file
-            if uploaded_file.name.endswith('.csv'):
-                raw_data = pd.read_csv(uploaded_file)
-            elif uploaded_file.name.endswith('.xlsx'):
-                raw_data = pd.read_excel(uploaded_file)
-            else:
-                st.error("Unsupported file format. Please upload a CSV or Excel file.")
-                return
-                
-            st.sidebar.success("Data loaded successfully!")
-            
-            # Initialize advanced analyzer
-            analyzer = AdvancedCryptoAnalyzer(raw_data)
-            processed_data = analyzer.preprocess_data()
-            
-            # Create tabs for different analyses
-            tab1, tab2, tab3, tab4, tab5 = st.tabs([
-                "🔍 Data Overview", 
-                "🌐 Clustering Analysis", 
-                "🎲 Risk Assessment", 
-                "🕸️ Network Analysis",
-                "📊 Advanced Insights"
-            ])
-            
-            with tab1:
-                st.header("Data Overview")
-                
-                # Quick stats
-                col1, col2, col3 = st.columns(3)
-                col1.metric("Total Transactions", len(processed_data))
-                col2.metric("Total Volume", f"{processed_data['Amount'].sum():,.2f}")
-                col3.metric("Unique Addresses", 
-                           f"{len(set(processed_data['Sender_Address'].unique()) | set(processed_data['Receiver_Address'].unique()))}")
-                
-                st.write("Processed Data Sample:")
-                st.dataframe(processed_data.head())
-                
-                # Transaction distribution
-                display_transaction_trends(processed_data)
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.subheader("Transactions by Currency")
-                    currency_dist = processed_data['Currency'].value_counts()
-                    fig = px.pie(
-                        values=currency_dist.values, 
-                        names=currency_dist.index, 
-                        title='Currency Distribution',
-                        hole=0.3
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                with col2:
-                    st.subheader("Transaction Status")
-                    status_dist = processed_data['Transaction_Status'].value_counts()
-                    fig = px.bar(
-                        x=status_dist.index, 
-                        y=status_dist.values, 
-                        title='Transaction Status Distribution',
-                        color=status_dist.index,
-                        color_discrete_sequence=px.colors.qualitative.Pastel
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            with tab2:
-                analyzer.advanced_clustering()
-            
-            with tab3:
-                analyzer.predictive_risk_scoring()
-            
-            with tab4:
-                analyzer.transaction_network_analysis()
-            
-            with tab5:
-                st.header("📊 Advanced Transaction Insights")
-                
-                # Advanced time series analysis
-                st.subheader("Transaction Volume Over Time")
-                time_series = processed_data.groupby([processed_data['Timestamp'].dt.date, 'Currency'])['Amount'].sum().reset_index()
-                fig = px.line(
-                    time_series, 
-                    x='Timestamp', 
-                    y='Amount', 
-                    color='Currency',
-                    title='Daily Transaction Volume'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Correlation heatmap
-                st.subheader("Feature Correlation")
-                numeric_cols = ['Amount', 'Transaction_Fee', 'Normalized_Amount']
-                corr_matrix = processed_data[numeric_cols].corr()
-                fig = px.imshow(
-                    corr_matrix, 
-                    text_auto=True, 
-                    title='Feature Correlation Heatmap',
-                    color_continuous_scale='Blues'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Whale alert section
-                display_whale_alert(processed_data)
-                
-                # Address activity analysis
-                st.subheader("Address Activity Analysis")
-                top_senders = processed_data['Sender_Address'].value_counts().head(10).reset_index()
-                top_senders.columns = ['Address', 'Count']
-                
-                fig = px.bar(
-                    top_senders,
-                    x='Address',
-                    y='Count',
-                    title='Most Active Sender Addresses',
-                    color='Count',
-                    color_continuous_scale='Viridis'
-                )
-                st.plotly_chart(fig, use_container_width=True)
-        
-        except Exception as e:
-            st.error(f"Error processing data: {str(e)}")
-    else:
-        st.info("📤 Please upload a CSV/Excel file or use sample data to begin analysis")
+    # Status filter
+    statuses = st.sidebar.multiselect(
+        "Transaction Status",
+        options=data['Transaction_Status'].unique(),
+        default=data['Transaction_Status'].unique()
+    )
+    
+    # Apply filters
+    filtered_data = data.copy()
+    if len(date_range) == 2:
+        filtered_data = filtered_data[
+            (filtered_data['Timestamp'].dt.date >= date_range[0]) &
+            (filtered_data['Timestamp'].dt.date <= date_range[1])
+        ]
+    
+    filtered_data = filtered_data[filtered_data['Currency'].isin(currencies)]
+    filtered_data = filtered_data[filtered_data['Transaction_Status'].isin(statuses)]
+    
+    # Display selected page
+    if page == "Market Overview":
+        show_price_tab()
+    
+    elif page == "Transaction Overview":
+        show_data_overview(filtered_data)
+    
+    elif page == "Fee Analysis":
+        analyze_transaction_fees(filtered_data)
+    
+    elif page == "Address Analysis":
+        analyze_address_activity(filtered_data)
+    
+    elif page == "Mining Pool Analysis":
+        analyze_mining_pools(filtered_data)
+    
+    elif page == "Temporal Patterns":
+        detect_temporal_patterns(filtered_data)
+    
+    # Footer
+    st.sidebar.markdown("---")
+    st.sidebar.caption(
+        """
+        CryptoInsight Analytics v1.0.0  
+        © 2025 Crypto Analytics, Inc.
+        """
+    )
 
 if __name__ == "__main__":
     main()
