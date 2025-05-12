@@ -85,37 +85,39 @@ class AdvancedCryptoAnalyzer:
         self.eth_data = None
         
     def preprocess_data(self):
-        """Advanced data preprocessing with feature engineering"""
-        st.write("🔍 Performing advanced data preprocessing...")
-        
-        # Convert timestamp
-        self.processed_data = self.original_data.copy()
-        self.processed_data['Timestamp'] = pd.to_datetime(self.processed_data['Timestamp'])
-        
-        # Feature engineering
-        self.processed_data['Year'] = self.processed_data['Timestamp'].dt.year
-        self.processed_data['Month'] = self.processed_data['Timestamp'].dt.month
-        self.processed_data['Day'] = self.processed_data['Timestamp'].dt.day
-        self.processed_data['Hour'] = self.processed_data['Timestamp'].dt.hour
-        self.processed_data['DayOfWeek'] = self.processed_data['Timestamp'].dt.day_name()
-        self.processed_data['DayOfWeekNum'] = self.processed_data['Timestamp'].dt.dayofweek
-        
-        # Normalize transaction amount
-        scaler = MinMaxScaler()
-        self.processed_data['Normalized_Amount'] = scaler.fit_transform(
-            self.processed_data['Amount'].values.reshape(-1, 1)
-        
-        # Sentiment proxy (based on transaction size and frequency)
-        self.processed_data['Transaction_Sentiment'] = np.where(
-            self.processed_data['Normalized_Amount'] > 0.7, 'High Confidence',
-            np.where(self.processed_data['Normalized_Amount'] > 0.3, 'Moderate Confidence', 'Low Confidence'))
-        
-        # Separate BTC and ETH data
-        self.btc_data = self.processed_data[self.processed_data['Currency'] == 'BTC']
-        self.eth_data = self.processed_data[self.processed_data['Currency'] == 'ETH']
-        
-        st.success("✅ Advanced preprocessing completed!")
-        return self.processed_data
+    """Advanced data preprocessing with feature engineering"""
+    st.write("🔍 Performing advanced data preprocessing...")
+    
+    # Convert timestamp
+    self.processed_data = self.original_data.copy()
+    self.processed_data['Timestamp'] = pd.to_datetime(self.processed_data['Timestamp'])
+    
+    # Feature engineering
+    self.processed_data['Year'] = self.processed_data['Timestamp'].dt.year
+    self.processed_data['Month'] = self.processed_data['Timestamp'].dt.month
+    self.processed_data['Day'] = self.processed_data['Timestamp'].dt.day
+    self.processed_data['Hour'] = self.processed_data['Timestamp'].dt.hour
+    self.processed_data['DayOfWeek'] = self.processed_data['Timestamp'].dt.day_name()
+    self.processed_data['DayOfWeekNum'] = self.processed_data['Timestamp'].dt.dayofweek
+    
+    # Normalize transaction amount
+    scaler = MinMaxScaler()
+    self.processed_data['Normalized_Amount'] = scaler.fit_transform(
+        self.processed_data['Amount'].values.reshape(-1, 1)  # Fixed this line
+    )
+    
+    # Sentiment proxy (based on transaction size and frequency)
+    self.processed_data['Transaction_Sentiment'] = np.where(
+        self.processed_data['Normalized_Amount'] > 0.7, 'High Confidence',
+        np.where(self.processed_data['Normalized_Amount'] > 0.3, 'Moderate Confidence', 'Low Confidence')
+    )
+    
+    # Separate BTC and ETH data
+    self.btc_data = self.processed_data[self.processed_data['Currency'] == 'BTC']
+    self.eth_data = self.processed_data[self.processed_data['Currency'] == 'ETH']
+    
+    st.success("✅ Advanced preprocessing completed!")
+    return self.processed_data
     
     def advanced_clustering(self):
         """Perform advanced clustering analysis"""
