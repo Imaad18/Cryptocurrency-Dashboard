@@ -7,7 +7,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from PIL import Image
-import yfinance as yf
 
 # Set page config
 st.set_page_config(
@@ -16,13 +15,193 @@ st.set_page_config(
     layout="wide"
 )
 
+# Apply custom CSS
+st.markdown("""
+<style>
+    .main-header {
+        font-size: 2.5rem;
+        color: #1E88E5;
+        text-align: center;
+        margin-bottom: 1rem;
+        font-weight: bold;
+    }
+    
+    .subheader {
+        font-size: 1.8rem;
+        color: #0D47A1;
+        margin-top: 2rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #1E88E5;
+    }
+    
+    .metric-card {
+        background-color: #f0f2f6;
+        border-radius: 10px;
+        padding: 1rem;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .crypto-positive {
+        color: #4CAF50 !important;
+        font-weight: bold;
+    }
+    
+    .crypto-negative {
+        color: #F44336 !important;
+        font-weight: bold;
+    }
+    
+    .stat-number {
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    
+    .sidebar-content {
+        background-color: #f9f9f9;
+        padding: 1rem;
+        border-radius: 10px;
+    }
+    
+    /* Theme selector */
+    .stRadio > div {
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+    }
+    
+    /* Customize DataFrames */
+    .dataframe-container {
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 1rem 0;
+    }
+    
+    /* Footer styling */
+    .footer {
+        text-align: center;
+        margin-top: 2rem;
+        padding-top: 1rem;
+        border-top: 1px solid #e0e0e0;
+        color: #666666;
+    }
+    
+    /* Make the page more readable on mobile */
+    @media (max-width: 768px) {
+        .main-header {
+            font-size: 2rem;
+        }
+        .subheader {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # Title and introduction
-st.title("📊 Cryptocurrency Analysis Dashboard")
-st.markdown("A simple dashboard to analyze cryptocurrency data")
+st.markdown("<h1 class='main-header'>📊 Cryptocurrency Analysis Dashboard</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; font-size: 1.2rem;'>A simple dashboard to analyze cryptocurrency data</p>", unsafe_allow_html=True)
 
 # Sidebar for navigation
-st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Overview", "Price Analysis", "Comparison", "Portfolio Tracker"])
+with st.sidebar:
+    st.markdown("<h2 style='text-align: center;'>Navigation</h2>", unsafe_allow_html=True)
+    
+    # Add logo placeholder
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 20px;">
+        <svg width="100" height="100" viewBox="0 0 200 200">
+            <circle cx="100" cy="100" r="80" fill="#1E88E5" />
+            <text x="100" y="115" font-size="50" text-anchor="middle" fill="white">₿</text>
+            <path d="M100,20 a80,80 0 0,1 0,160" fill="none" stroke="#64B5F6" stroke-width="12" />
+        </svg>
+        <h3>CryptoTrack</h3>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<div class='sidebar-content'>", unsafe_allow_html=True)
+    page = st.radio("", ["📈 Overview", "💹 Price Analysis", "🔄 Comparison", "💼 Portfolio Tracker"])
+    page = page.split(" ")[1]  # Extract the page name without emoji
+    
+    # Theme selector
+    st.markdown("### 🎨 Theme")
+    theme = st.radio("", ["Light", "Dark", "Blue"], horizontal=True)
+    
+    # Apply theme
+    if theme == "Dark":
+        st.markdown("""
+        <style>
+            body {
+                color: #f1f1f1;
+                background-color: #121212;
+            }
+            .css-1d391kg, .css-1wrcr25, .stApp {
+                background-color: #121212;
+            }
+            .metric-card {
+                background-color: #1e1e1e;
+                color: #f1f1f1;
+            }
+            .sidebar-content {
+                background-color: #1e1e1e;
+                color: #f1f1f1;
+            }
+            .subheader {
+                border-bottom: 2px solid #bb86fc;
+                color: #bb86fc;
+            }
+            .main-header {
+                color: #bb86fc;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    elif theme == "Blue":
+        st.markdown("""
+        <style>
+            body {
+                color: #ffffff;
+                background-color: #0D47A1;
+            }
+            .css-1d391kg, .css-1wrcr25, .stApp {
+                background-color: #0D47A1;
+                background-image: linear-gradient(160deg, #0D47A1 0%, #1976D2 100%);
+            }
+            .metric-card {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+                backdrop-filter: blur(10px);
+            }
+            .sidebar-content {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+                backdrop-filter: blur(10px);
+            }
+            .subheader {
+                border-bottom: 2px solid #64B5F6;
+                color: #E3F2FD;
+            }
+            .main-header {
+                color: #E3F2FD;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    # Market status
+    st.markdown("### 📊 Market Status")
+    market_status = "Open"  # This would be determined by API in a full implementation
+    st.markdown(f"<div style='text-align: center; margin: 10px 0;'><span style='background-color: {'#4CAF50' if market_status=='Open' else '#F44336'}; color: white; padding: 5px 10px; border-radius: 20px;'>{market_status}</span></div>", unsafe_allow_html=True)
+    
+    # Display current time
+    st.markdown("### 🕒 Current Time")
+    st.markdown(f"<div style='text-align: center;'>{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</div>", unsafe_allow_html=True)
+    
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+    # Disclaimer
+    with st.expander("Disclaimer"):
+        st.markdown("""
+        This dashboard is for educational purposes only. Cryptocurrency investments are subject to market risks. 
+        Data is provided by CoinGecko API and may not be real-time.
+        """)
+
 
 # Function to get crypto data using CoinGecko API
 @st.cache_data(ttl=300)  # Cache data for 5 minutes
@@ -34,7 +213,16 @@ def get_crypto_data(coin_id, days=30):
             "days": days,
             "interval": "daily"
         }
-        response = requests.get(url, params=params)
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "CryptoTrack Dashboard"
+        }
+        response = requests.get(url, params=params, headers=headers)
+        
+        if response.status_code == 429:
+            st.warning("API rate limit reached. Using cached data if available or trying again shortly...")
+            return pd.DataFrame()
+        
         data = response.json()
         
         # Convert price data to DataFrame
@@ -59,7 +247,16 @@ def get_top_cryptos(limit=50):
             "page": 1,
             "sparkline": False
         }
-        response = requests.get(url, params=params)
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "CryptoTrack Dashboard"
+        }
+        response = requests.get(url, params=params, headers=headers)
+        
+        if response.status_code == 429:
+            st.warning("API rate limit reached. Using cached data if available or trying again shortly...")
+            return pd.DataFrame()
+        
         return pd.DataFrame(response.json())
     except Exception as e:
         st.error(f"Error fetching top cryptocurrencies: {e}")
@@ -76,8 +273,34 @@ popular_cryptos = {
     "Polkadot": "polkadot",
     "Dogecoin": "dogecoin",
     "Avalanche": "avalanche-2",
-    "Polygon": "matic-network"
+    "Polygon": "matic-network",
+    "Litecoin": "litecoin",
+    "Chainlink": "chainlink",
+    "Stellar": "stellar",
+    "Uniswap": "uniswap",
+    "Tron": "tron"
 }
+
+# Show loading spinner for data fetching
+@st.cache_data
+def get_data_with_progress(func, *args, **kwargs):
+    """Wrapper function to show loading spinner"""
+    with st.spinner(f"Fetching data..."):
+        return func(*args, **kwargs)
+
+# Function to display metrics in a nice styled card
+def display_metric(label, value, delta=None, prefix="", suffix=""):
+    html = f"""
+    <div class="metric-card">
+        <div style="font-size: 0.9rem; color: #666;">{label}</div>
+        <div class="stat-number">{prefix}{value}{suffix}</div>
+    """
+    if delta is not None:
+        color_class = "crypto-positive" if float(delta.replace("%", "")) >= 0 else "crypto-negative"
+        html += f'<div class="{color_class}">{delta}</div>'
+    
+    html += "</div>"
+    return html
 
 # Function to calculate technical indicators
 def calculate_indicators(df):
@@ -96,24 +319,247 @@ def calculate_indicators(df):
     rs = avg_gain / avg_loss
     df['RSI'] = 100 - (100 / (1 + rs))
     
+    # Calculate MACD
+    df['EMA_12'] = df['price'].ewm(span=12, adjust=False).mean()
+    df['EMA_26'] = df['price'].ewm(span=26, adjust=False).mean()
+    df['MACD'] = df['EMA_12'] - df['EMA_26']
+    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
+    df['MACD_Hist'] = df['MACD'] - df['Signal']
+    
+    # Calculate Bollinger Bands
+    df['MA_20'] = df['price'].rolling(window=20).mean()
+    df['STD_20'] = df['price'].rolling(window=20).std()
+    df['Upper_Band'] = df['MA_20'] + (df['STD_20'] * 2)
+    df['Lower_Band'] = df['MA_20'] - (df['STD_20'] * 2)
+    
     return df
 
 # Overview Page
 if page == "Overview":
-    st.header("Cryptocurrency Market Overview")
+    st.markdown("<h2 class='subheader'>Cryptocurrency Market Overview</h2>", unsafe_allow_html=True)
     
-    # Load top cryptocurrencies data
-    top_cryptos = get_top_cryptos(limit=25)
+    # Show loading animation while fetching data
+    with st.spinner("Fetching market data..."):
+        # Load top cryptocurrencies data
+        top_cryptos = get_data_with_progress(get_top_cryptos, limit=25)
     
     if not top_cryptos.empty:
         # Display market stats
-        col1, col2, col3, col4 = st.columns(4)
+        st.markdown("<div style='display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;'>", unsafe_allow_html=True)
+        
+        # Total Market Cap
+        market_cap_sum = int(top_cryptos['market_cap'].sum() / 1e9)
+        st.markdown(display_metric("Total Market Cap", f"{market_cap_sum:,}B", prefix="$"), unsafe_allow_html=True)
+        
+        # 24h Volume
+        volume_sum = int(top_cryptos['total_volume'].sum() / 1e9)
+        st.markdown(display_metric("24h Volume", f"{volume_sum:,}B", prefix="$"), unsafe_allow_html=True)
+        
+        # Bitcoin Dominance
+        bitcoin_dominance = (top_cryptos[top_cryptos['id'] == 'bitcoin']['market_cap'].values[0] / 
+                           top_cryptos['market_cap'].sum()) * 100
+        st.markdown(display_metric("Bitcoin Dominance", f"{bitcoin_dominance:.2f}", suffix="%"), unsafe_allow_html=True)
+        
+        # Avg 24h Change
+        avg_change = top_cryptos['price_change_percentage_24h'].mean()
+        delta = f"{avg_change:.2f}%"
+        st.markdown(display_metric("Avg 24h Change", f"{avg_change:.2f}", delta=delta, suffix="%"), unsafe_allow_html=True)
+        
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Market Trends Visualization
+        st.markdown("<h3 class='subheader'>Market Trends</h3>", unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([2, 1])
         
         with col1:
-            st.metric("Total Market Cap", f"${int(top_cryptos['market_cap'].sum() / 1e9)}B")
+            # Market trend chart showing price movement for top 5 cryptos
+            st.markdown("<h4>Top 5 Cryptocurrencies Price Trend (7d)</h4>", unsafe_allow_html=True)
+            
+            # Get price data for top 5 cryptos
+            trend_fig = go.Figure()
+            
+            for i, crypto in enumerate(top_cryptos.head(5)['id']):
+                df = get_crypto_data(crypto, days=7)
+                if not df.empty:
+                    trend_fig.add_trace(go.Scatter(
+                        x=df['date'], 
+                        y=df['price'],
+                        mode='lines',
+                        name=top_cryptos.iloc[i]['name']
+                    ))
+            
+            trend_fig.update_layout(
+                height=400,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                margin=dict(l=20, r=20, t=40, b=20),
+                hovermode="x unified"
+            )
+            st.plotly_chart(trend_fig, use_container_width=True)
         
         with col2:
-            st.metric("24h Volume", f"${int(top_cryptos['total_volume'].sum() / 1e9)}B")
+            # Market sentiment gauge based on 24h price changes
+            st.markdown("<h4>Market Sentiment</h4>", unsafe_allow_html=True)
+            
+            positive_cryptos = len(top_cryptos[top_cryptos['price_change_percentage_24h'] > 0])
+            total_cryptos = len(top_cryptos)
+            sentiment_score = (positive_cryptos / total_cryptos) * 100
+            
+            # Create a gauge chart for sentiment
+            sentiment_labels = {
+                (0, 20): "Very Bearish",
+                (20, 40): "Bearish",
+                (40, 60): "Neutral",
+                (60, 80): "Bullish",
+                (80, 100): "Very Bullish"
+            }
+            
+            # Determine current sentiment
+            current_sentiment = None
+            for (lower, upper), label in sentiment_labels.items():
+                if lower <= sentiment_score <= upper:
+                    current_sentiment = label
+                    break
+            
+            # Create gauge chart
+            gauge_fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=sentiment_score,
+                domain={'x': [0, 1], 'y': [0, 1]},
+                gauge={
+                    'axis': {'range': [0, 100]},
+                    'bar': {'color': "rgba(50, 150, 255, 0.8)"},
+                    'steps': [
+                        {'range': [0, 20], 'color': "#EF5350"},
+                        {'range': [20, 40], 'color': "#FFA726"},
+                        {'range': [40, 60], 'color': "#FFEE58"},
+                        {'range': [60, 80], 'color': "#66BB6A"},
+                        {'range': [80, 100], 'color': "#26A69A"}
+                    ],
+                    'threshold': {
+                        'line': {'color': "red", 'width': 4},
+                        'thickness': 0.75,
+                        'value': sentiment_score
+                    }
+                },
+                title={'text': f"Current: {current_sentiment}"}
+            ))
+            
+            gauge_fig.update_layout(
+                height=300,
+                margin=dict(l=20, r=20, t=70, b=20),
+            )
+            
+            st.plotly_chart(gauge_fig, use_container_width=True)
+        
+        # Display top cryptocurrencies table
+        st.markdown("<h3 class='subheader'>Top Cryptocurrencies by Market Cap</h3>", unsafe_allow_html=True)
+        
+        # Format the table
+        formatted_df = top_cryptos[['name', 'symbol', 'current_price', 'market_cap', 
+                                 'price_change_percentage_24h', 'total_volume']].copy()
+        
+        formatted_df.columns = ['Name', 'Symbol', 'Price (USD)', 'Market Cap (USD)', 
+                            '24h Change (%)', '24h Volume (USD)']
+        
+        # Add styling to the table
+        def highlight_change(val):
+            color = '#4CAF50' if val > 0 else '#F44336'
+            return f'color: {color}; font-weight: bold'
+        
+        # Format the values
+        formatted_df['Symbol'] = formatted_df['Symbol'].str.upper()
+        formatted_df['Price (USD)'] = formatted_df['Price (USD)'].apply(lambda x: f"${x:,.2f}")
+        formatted_df['Market Cap (USD)'] = formatted_df['Market Cap (USD)'].apply(lambda x: f"${x:,.0f}")
+        
+        # Store the raw values for styling but display the formatted values
+        change_vals = top_cryptos['price_change_percentage_24h']
+        formatted_df['24h Change (%)'] = formatted_df['24h Change (%)'].apply(lambda x: f"{x:.2f}%")
+        
+        formatted_df['24h Volume (USD)'] = formatted_df['24h Volume (USD)'].apply(lambda x: f"${x:,.0f}")
+        
+        st.markdown('<div class="dataframe-container">', unsafe_allow_html=True)
+        st.dataframe(
+            formatted_df,
+            column_config={
+                "24h Change (%)": st.column_config.Column(
+                    "24h Change (%)",
+                    help="Price change in the last 24 hours",
+                    width="medium",
+                )
+            },
+            use_container_width=True,
+            hide_index=True
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Market visualizations
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Market Cap Distribution
+            st.markdown("<h3 class='subheader'>Market Cap Distribution</h3>", unsafe_allow_html=True)
+            fig = px.pie(
+                top_cryptos.head(8), 
+                values='market_cap', 
+                names='name', 
+                title='Top 8 Cryptocurrencies by Market Cap',
+                hole=0.4,
+                color_discrete_sequence=px.colors.qualitative.Set3
+            )
+            fig.update_traces(textposition='inside', textinfo='percent+label')
+            fig.update_layout(
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                margin=dict(l=20, r=20, t=60, b=60)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+        
+        with col2:
+            # 24h Price Change
+            st.markdown("<h3 class='subheader'>24h Price Change</h3>", unsafe_allow_html=True)
+            
+            # Get top 5 gainers and losers
+            gainers = top_cryptos.sort_values(by='price_change_percentage_24h', ascending=False).head(5)
+            losers = top_cryptos.sort_values(by='price_change_percentage_24h', ascending=True).head(5)
+            
+            combined = pd.concat([gainers, losers])
+            
+            fig = px.bar(
+                combined, 
+                x='name', 
+                y='price_change_percentage_24h',
+                title='Top Gainers and Losers (24h)',
+                labels={'name': 'Cryptocurrency', 'price_change_percentage_24h': '24h Change (%)'},
+                color='price_change_percentage_24h',
+                color_continuous_scale=['#F44336', '#FFFFFF', '#4CAF50'],
+                range_color=[-max(abs(combined['price_change_percentage_24h'])), max(abs(combined['price_change_percentage_24h']))]
+            )
+            fig.update_layout(
+                height=400,
+                margin=dict(l=20, r=20, t=60, b=100),
+                xaxis_tickangle=-45
+            )
+            st.plotly_chart(fig, use_container_width=True)
+    
+    else:
+        st.warning("No data available. Please check your internet connection or try again later.")
+        
+        # Show demo data option
+        if st.button("Load Demo Data"):
+            # Create demo data for display purposes
+            demo_data = {
+                "name": ["Bitcoin", "Ethereum", "Binance Coin", "Cardano", "Solana"],
+                "symbol": ["btc", "eth", "bnb", "ada", "sol"],
+                "current_price": [45000, 3200, 450, 1.2, 100],
+                "market_cap": [800000000000, 350000000000, 80000000000, 40000000000, 30000000000],
+                "price_change_percentage_24h": [2.5, -1.3, 0.8, -2.1, 3.7],
+                "total_volume": [30000000000, 20000000000, 5000000000, 2000000000, 3000000000]
+            }
+            demo_df = pd.DataFrame(demo_data)
+            
+            # Display demo data with a clear notice
+            st.info("⚠️ This is demo data for display purposes only. It does not reflect real market conditions.")
+            st.dataframe(demo_df)${int(top_cryptos['total_volume'].sum() / 1e9)}B")
         
         with col3:
             bitcoin_dominance = (top_cryptos[top_cryptos['id'] == 'bitcoin']['market_cap'].values[0] / 
