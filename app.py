@@ -223,6 +223,10 @@ def get_crypto_data(coin_id, days=30):
             st.warning("API rate limit reached. Using cached data if available or trying again shortly...")
             return pd.DataFrame()
         
+        if response.status_code != 200:
+            st.warning(f"API error: {response.status_code}. Using cached data if available.")
+            return pd.DataFrame()
+        
         data = response.json()
         
         # Convert price data to DataFrame
@@ -255,6 +259,10 @@ def get_top_cryptos(limit=50):
         
         if response.status_code == 429:
             st.warning("API rate limit reached. Using cached data if available or trying again shortly...")
+            return pd.DataFrame()
+        
+        if response.status_code != 200:
+            st.warning(f"API error: {response.status_code}. Using cached data if available.")
             return pd.DataFrame()
         
         return pd.DataFrame(response.json())
@@ -296,7 +304,8 @@ def display_metric(label, value, delta=None, prefix="", suffix=""):
         <div class="stat-number">{prefix}{value}{suffix}</div>
     """
     if delta is not None:
-        color_class = "crypto-positive" if float(delta.replace("%", "")) >= 0 else "crypto-negative"
+        delta_value = float(str(delta).replace("%", ""))
+        color_class = "crypto-positive" if delta_value >= 0 else "crypto-negative"
         html += f'<div class="{color_class}">{delta}</div>'
     
     html += "</div>"
@@ -304,35 +313,103 @@ def display_metric(label, value, delta=None, prefix="", suffix=""):
 
 # Function to calculate technical indicators
 def calculate_indicators(df):
+    # Create a copy to avoid the SettingWithCopyWarning
+    df_indicators = df.copy()
+    
     # Calculate Simple Moving Averages
-    df['SMA_7'] = df['price'].rolling(window=7).mean()
-    df['SMA_25'] = df['price'].rolling(window=25).mean()
+    df_indicators['SMA_7'] = df_indicators['price'].rolling(window=7).mean()
+    df_indicators['SMA_25'] = df_indicators['price'].rolling(window=25).mean()
     
     # Calculate Relative Strength Index (RSI)
-    delta = df['price'].diff()
+    delta = df_indicators['price'].diff()
     gain = delta.where(delta > 0, 0)
     loss = -delta.where(delta < 0, 0)
     
     avg_gain = gain.rolling(window=14).mean()
     avg_loss = loss.rolling(window=14).mean()
     
+    # Avoid division by zero
+    avg_loss = avg_loss.replace(0, float('inf'))
     rs = avg_gain / avg_loss
-    df['RSI'] = 100 - (100 / (1 + rs))
+    df_indicators['RSI'] = 100 - (100 / (1 + rs))
     
     # Calculate MACD
-    df['EMA_12'] = df['price'].ewm(span=12, adjust=False).mean()
-    df['EMA_26'] = df['price'].ewm(span=26, adjust=False).mean()
-    df['MACD'] = df['EMA_12'] - df['EMA_26']
-    df['Signal'] = df['MACD'].ewm(span=9, adjust=False).mean()
-    df['MACD_Hist'] = df['MACD'] - df['Signal']
+    df_indicators['EMA_12'] = df_indicators['price'].ewm(span=12, adjust=False).mean()
+    df_indicators['EMA_26'] = df_indicators['price'].ewm(span=26, adjust=False).mean()
+    df_indicators['MACD'] = df_indicators['EMA_12'] - df_indicators['EMA_26']
+    df_indicators['Signal'] = df_indicators['MACD'].ewm(span=9, adjust=False).mean()
+    df_indicators['MACD_Hist'] = df_indicators['MACD'] - df_indicators['Signal']
     
     # Calculate Bollinger Bands
-    df['MA_20'] = df['price'].rolling(window=20).mean()
-    df['STD_20'] = df['price'].rolling(window=20).std()
-    df['Upper_Band'] = df['MA_20'] + (df['STD_20'] * 2)
-    df['Lower_Band'] = df['MA_20'] - (df['STD_20'] * 2)
+    df_indicators['MA_20'] = df_indicators['price'].rolling(window=20).mean()
+    df_indicators['STD_20'] = df_indicators['price'].rolling(window=20).std()
+    df_indicators['Upper_Band'] = df_indicators['MA_20'] + (df_indicators['STD_20'] * 2)
+    df_indicators['Lower_Band'] = df_indicators['MA_20'] - (df_indicators['STD_20'] * 2)
     
-    return df
+    return df_indicators
+
+# Function to create a sample portfolio for demo purposes
+def create_sample_portfolio():
+    portfolio = []
+    
+    # Add Bitcoin
+    portfolio.append({
+        "crypto_name": "Bitcoin",
+        "crypto_id": "bitcoin",
+        "quantity": 0.5,
+        "purchase_price": 40000,
+        "purchase_date": datetime.now() - timedelta(days=30),
+        "current_price": 45000,
+        "current_value": 22500,
+        "profit_loss": 2500,
+        "profit_loss_percentage": 12.5
+    })
+    
+    # Add Ethereum
+    portfolio.append({
+        "crypto_name": "Ethereum",
+        "crypto_id": "ethereum",
+        "quantity": 3.0,
+        "purchase_price": 2800,
+        "purchase_date": datetime.now() - timedelta(days=14),
+        "current_price": 3000,
+        "current_value": 9000,
+        "profit_loss": 600,
+        "profit_loss_percentage": 7.14
+    })
+    
+    # Add Cardano
+    portfolio.append({
+        "crypto_name": "Cardano",
+        "crypto_id": "cardano",
+        "quantity": 1000.0,
+        "purchase_price": 1.2,
+        "purchase_date": datetime.now() - timedelta(days=7),
+        "current_price": 1.1,
+        "current_value": 1100,
+        "profit_loss": -100,
+        "profit_loss_percentage": -8.33
+    })
+    
+    return portfolio
+
+# Create demo data for display purposes when API fails
+def create_demo_data():
+    demo_data = {
+        "name": ["Bitcoin", "Ethereum", "Binance Coin", "Cardano", "Solana", 
+                "XRP", "Polkadot", "Dogecoin", "Avalanche", "Polygon"],
+        "symbol": ["btc", "eth", "bnb", "ada", "sol", "xrp", "dot", "doge", "avax", "matic"],
+        "current_price": [45000, 3200, 450, 1.2, 100, 0.5, 15, 0.1, 30, 0.8],
+        "market_cap": [800000000000, 350000000000, 80000000000, 40000000000, 30000000000,
+                     20000000000, 15000000000, 10000000000, 8000000000, 7000000000],
+        "price_change_percentage_24h": [2.5, -1.3, 0.8, -2.1, 3.7, 1.2, -0.5, 4.2, -1.8, 2.7],
+        "total_volume": [30000000000, 20000000000, 5000000000, 2000000000, 3000000000,
+                        1500000000, 1000000000, 800000000, 700000000, 500000000],
+        "id": ["bitcoin", "ethereum", "binancecoin", "cardano", "solana", 
+             "ripple", "polkadot", "dogecoin", "avalanche-2", "matic-network"]
+    }
+    return pd.DataFrame(demo_data)
+
 
 # Overview Page
 if page == "Overview":
@@ -356,9 +433,12 @@ if page == "Overview":
         st.markdown(display_metric("24h Volume", f"{volume_sum:,}B", prefix="$"), unsafe_allow_html=True)
         
         # Bitcoin Dominance
-        bitcoin_dominance = (top_cryptos[top_cryptos['id'] == 'bitcoin']['market_cap'].values[0] / 
-                           top_cryptos['market_cap'].sum()) * 100
-        st.markdown(display_metric("Bitcoin Dominance", f"{bitcoin_dominance:.2f}", suffix="%"), unsafe_allow_html=True)
+        btc_data = top_cryptos[top_cryptos['id'] == 'bitcoin']
+        if not btc_data.empty:
+            bitcoin_dominance = (btc_data['market_cap'].values[0] / top_cryptos['market_cap'].sum()) * 100
+            st.markdown(display_metric("Bitcoin Dominance", f"{bitcoin_dominance:.2f}", suffix="%"), unsafe_allow_html=True)
+        else:
+            st.markdown(display_metric("Bitcoin Dominance", "N/A", suffix="%"), unsafe_allow_html=True)
         
         # Avg 24h Change
         avg_change = top_cryptos['price_change_percentage_24h'].mean()
@@ -379,9 +459,11 @@ if page == "Overview":
             # Get price data for top 5 cryptos
             trend_fig = go.Figure()
             
+            has_data = False
             for i, crypto in enumerate(top_cryptos.head(5)['id']):
                 df = get_crypto_data(crypto, days=7)
                 if not df.empty:
+                    has_data = True
                     trend_fig.add_trace(go.Scatter(
                         x=df['date'], 
                         y=df['price'],
@@ -389,13 +471,16 @@ if page == "Overview":
                         name=top_cryptos.iloc[i]['name']
                     ))
             
-            trend_fig.update_layout(
-                height=400,
-                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-                margin=dict(l=20, r=20, t=40, b=20),
-                hovermode="x unified"
-            )
-            st.plotly_chart(trend_fig, use_container_width=True)
+            if has_data:
+                trend_fig.update_layout(
+                    height=400,
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    margin=dict(l=20, r=20, t=40, b=20),
+                    hovermode="x unified"
+                )
+                st.plotly_chart(trend_fig, use_container_width=True)
+            else:
+                st.warning("Unable to fetch price trends. Please try again later.")
         
         with col2:
             # Market sentiment gauge based on 24h price changes
@@ -461,11 +546,6 @@ if page == "Overview":
         
         formatted_df.columns = ['Name', 'Symbol', 'Price (USD)', 'Market Cap (USD)', 
                             '24h Change (%)', '24h Volume (USD)']
-        
-        # Add styling to the table
-        def highlight_change(val):
-            color = '#4CAF50' if val > 0 else '#F44336'
-            return f'color: {color}; font-weight: bold'
         
         # Format the values
         formatted_df['Symbol'] = formatted_df['Symbol'].str.upper()
@@ -547,71 +627,30 @@ if page == "Overview":
         # Show demo data option
         if st.button("Load Demo Data"):
             # Create demo data for display purposes
-            demo_data = {
-                "name": ["Bitcoin", "Ethereum", "Binance Coin", "Cardano", "Solana"],
-                "symbol": ["btc", "eth", "bnb", "ada", "sol"],
-                "current_price": [45000, 3200, 450, 1.2, 100],
-                "market_cap": [800000000000, 350000000000, 80000000000, 40000000000, 30000000000],
-                "price_change_percentage_24h": [2.5, -1.3, 0.8, -2.1, 3.7],
-                "total_volume": [30000000000, 20000000000, 5000000000, 2000000000, 3000000000]
-            }
-            demo_df = pd.DataFrame(demo_data)
+            demo_df = create_demo_data()
             
             # Display demo data with a clear notice
             st.info("⚠️ This is demo data for display purposes only. It does not reflect real market conditions.")
-            st.dataframe(demo_df)${int(top_cryptos['total_volume'].sum() / 1e9)}B")
-        
-        with col3:
-            bitcoin_dominance = (top_cryptos[top_cryptos['id'] == 'bitcoin']['market_cap'].values[0] / 
-                               top_cryptos['market_cap'].sum()) * 100
-            st.metric("Bitcoin Dominance", f"{bitcoin_dominance:.2f}%")
-        
-        with col4:
-            avg_change = top_cryptos['price_change_percentage_24h'].mean()
-            st.metric("Avg 24h Change", f"{avg_change:.2f}%", 
-                     delta=f"{avg_change:.2f}%")
-        
-        # Display top cryptocurrencies table
-        st.subheader("Top Cryptocurrencies by Market Cap")
-        
-        # Format the table
-        formatted_df = top_cryptos[['name', 'symbol', 'current_price', 'market_cap', 
-                                 'price_change_percentage_24h', 'total_volume']].copy()
-        
-        formatted_df.columns = ['Name', 'Symbol', 'Price (USD)', 'Market Cap (USD)', 
-                            '24h Change (%)', '24h Volume (USD)']
-        
-        # Format the values
-        formatted_df['Symbol'] = formatted_df['Symbol'].str.upper()
-        formatted_df['Price (USD)'] = formatted_df['Price (USD)'].apply(lambda x: f"${x:,.2f}")
-        formatted_df['Market Cap (USD)'] = formatted_df['Market Cap (USD)'].apply(lambda x: f"${x:,.0f}")
-        formatted_df['24h Change (%)'] = formatted_df['24h Change (%)'].apply(lambda x: f"{x:.2f}%")
-        formatted_df['24h Volume (USD)'] = formatted_df['24h Volume (USD)'].apply(lambda x: f"${x:,.0f}")
-        
-        st.dataframe(formatted_df, use_container_width=True)
-        
-        # Market Cap Distribution
-        st.subheader("Market Cap Distribution")
-        fig = px.pie(top_cryptos.head(10), values='market_cap', names='name', 
-                    title='Top 10 Cryptocurrencies by Market Cap')
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # 24h Price Change
-        st.subheader("24h Price Change")
-        sorted_by_change = top_cryptos.sort_values(by='price_change_percentage_24h', ascending=False).head(10)
-        fig = px.bar(sorted_by_change, x='name', y='price_change_percentage_24h', 
-                    title='Top 10 Performers (24h)',
-                    labels={'name': 'Cryptocurrency', 'price_change_percentage_24h': '24h Change (%)'},
-                    color='price_change_percentage_24h',
-                    color_continuous_scale=['red', 'green'])
-        st.plotly_chart(fig, use_container_width=True)
-    
-    else:
-        st.warning("No data available. Please check your internet connection or try again later.")
+            
+            # Format the demo data for display
+            formatted_demo = demo_df[['name', 'symbol', 'current_price', 'market_cap', 
+                                   'price_change_percentage_24h', 'total_volume']].copy()
+            
+            formatted_demo.columns = ['Name', 'Symbol', 'Price (USD)', 'Market Cap (USD)', 
+                                  '24h Change (%)', '24h Volume (USD)']
+            
+            # Format the values
+            formatted_demo['Symbol'] = formatted_demo['Symbol'].str.upper()
+            formatted_demo['Price (USD)'] = formatted_demo['Price (USD)'].apply(lambda x: f"${x:,.2f}")
+            formatted_demo['Market Cap (USD)'] = formatted_demo['Market Cap (USD)'].apply(lambda x: f"${x:,.0f}")
+            formatted_demo['24h Change (%)'] = formatted_demo['24h Change (%)'].apply(lambda x: f"{x:.2f}%")
+            formatted_demo['24h Volume (USD)'] = formatted_demo['24h Volume (USD)'].apply(lambda x: f"${x:,.0f}")
+            
+            st.dataframe(formatted_demo, use_container_width=True)
 
 # Price Analysis Page
 elif page == "Price Analysis":
-    st.header("Cryptocurrency Price Analysis")
+    st.markdown("<h2 class='subheader'>Cryptocurrency Price Analysis</h2>", unsafe_allow_html=True)
     
     # Select cryptocurrency and timeframe
     col1, col2 = st.columns(2)
@@ -631,342 +670,223 @@ elif page == "Price Analysis":
     }
     
     # Get data
-    crypto_id = popular_cryptos[selected_crypto]
-    df = get_crypto_data(crypto_id, timeframe_days[timeframe])
+    with st.spinner(f"Fetching {selected_crypto} data..."):
+        crypto_id = popular_cryptos[selected_crypto]
+        df = get_crypto_data(crypto_id, days=timeframe_days[timeframe])
     
     if not df.empty:
-        # Price chart
-        st.subheader(f"{selected_crypto} Price Chart")
-        fig = px.line(df, x='date', y='price', title=f"{selected_crypto} Price (USD)")
-        fig.update_layout(xaxis_title="Date", yaxis_title="Price (USD)")
-        st.plotly_chart(fig, use_container_width=True)
-        
         # Calculate technical indicators
         df_indicators = calculate_indicators(df)
         
-        # Technical indicators
-        st.subheader("Technical Indicators")
-        tab1, tab2 = st.tabs(["Moving Averages", "RSI"])
+        # Display current price metrics
+        latest_price = df['price'].iloc[-1]
+        prev_price = df['price'].iloc[-2] if len(df) > 1 else latest_price
+        price_change = ((latest_price - prev_price) / prev_price) * 100
+        price_change_str = f"{price_change:.2f}%"
+        
+        st.markdown("<div style='display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;'>", unsafe_allow_html=True)
+        st.markdown(display_metric("Current Price", f"${latest_price:,.2f}", delta=price_change_str), unsafe_allow_html=True)
+        st.markdown(display_metric("24h High", f"${df['price'].max():,.2f}"), unsafe_allow_html=True)
+        st.markdown(display_metric("24h Low", f"${df['price'].min():,.2f}"), unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Price chart with technical indicators
+        st.markdown("<h3 class='subheader'>Price Chart with Indicators</h3>", unsafe_allow_html=True)
+        
+        # Create tabs for different chart views
+        tab1, tab2, tab3 = st.tabs(["Price Trend", "Technical Indicators", "Candlestick"])
         
         with tab1:
-            # Moving Averages
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df_indicators['date'], y=df_indicators['price'], 
-                                    mode='lines', name='Price'))
-            fig.add_trace(go.Scatter(x=df_indicators['date'], y=df_indicators['SMA_7'], 
-                                    mode='lines', name='7-Day SMA', line=dict(dash='dash')))
-            fig.add_trace(go.Scatter(x=df_indicators['date'], y=df_indicators['SMA_25'], 
-                                    mode='lines', name='25-Day SMA', line=dict(dash='dot')))
-            fig.update_layout(title=f"{selected_crypto} Price with Moving Averages",
-                            xaxis_title="Date", yaxis_title="Price (USD)")
+            # Basic price trend
+            fig = px.line(df, x='date', y='price', title=f"{selected_crypto} Price Trend")
+            fig.update_layout(
+                yaxis_title="Price (USD)",
+                hovermode="x unified",
+                height=500
+            )
             st.plotly_chart(fig, use_container_width=True)
         
         with tab2:
-            # RSI
+            # Technical indicators visualization
             fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df_indicators['date'], y=df_indicators['RSI'], 
-                                    mode='lines', name='RSI'))
             
-            # Add overbought and oversold lines
-            fig.add_shape(type='line', x0=df_indicators['date'].iloc[0], y0=70, 
-                        x1=df_indicators['date'].iloc[-1], y1=70,
-                        line=dict(color='red', dash='dash'))
-            fig.add_shape(type='line', x0=df_indicators['date'].iloc[0], y0=30, 
-                        x1=df_indicators['date'].iloc[-1], y1=30,
-                        line=dict(color='green', dash='dash'))
+            # Add price line
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['price'],
+                name='Price',
+                line=dict(color='#1E88E5', width=2)
+            ))
             
-            fig.update_layout(title=f"{selected_crypto} RSI (14-Day)",
-                            xaxis_title="Date", yaxis_title="RSI Value",
-                            yaxis=dict(range=[0, 100]))
+            # Add moving averages
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['SMA_7'],
+                name='7-day SMA',
+                line=dict(color='#FFA000', width=1)
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['SMA_25'],
+                name='25-day SMA',
+                line=dict(color='#43A047', width=1)
+            ))
+            
+            # Add Bollinger Bands
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['Upper_Band'],
+                name='Upper Band',
+                line=dict(color='#757575', width=1, dash='dot')
+            ))
+            
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['Lower_Band'],
+                name='Lower Band',
+                line=dict(color='#757575', width=1, dash='dot'),
+                fill='tonexty',
+                fillcolor='rgba(117,117,117,0.1)'
+            ))
+            
+            fig.update_layout(
+                title=f"{selected_crypto} Price with Technical Indicators",
+                yaxis_title="Price (USD)",
+                hovermode="x unified",
+                height=500,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # RSI and MACD subplots
+            st.markdown("<h4>Momentum Indicators</h4>", unsafe_allow_html=True)
+            
+            fig = make_subplots(rows=2, cols=1, shared_xaxes=True, vertical_spacing=0.05)
+            
+            # RSI
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['RSI'],
+                name='RSI',
+                line=dict(color='#7E57C2')
+            ), row=1, col=1)
+            
+            # Add RSI thresholds
+            fig.add_hline(y=70, line_dash="dash", line_color="red", row=1, col=1)
+            fig.add_hline(y=30, line_dash="dash", line_color="green", row=1, col=1)
+            
+            # MACD
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['MACD'],
+                name='MACD',
+                line=dict(color='#26A69A')
+            ), row=2, col=1)
+            
+            fig.add_trace(go.Scatter(
+                x=df_indicators['date'],
+                y=df_indicators['Signal'],
+                name='Signal',
+                line=dict(color='#FF7043')
+            ), row=2, col=1)
+            
+            # MACD Histogram
+            colors = ['green' if val >= 0 else 'red' for val in df_indicators['MACD_Hist']]
+            fig.add_trace(go.Bar(
+                x=df_indicators['date'],
+                y=df_indicators['MACD_Hist'],
+                name='MACD Hist',
+                marker_color=colors
+            ), row=2, col=1)
+            
+            fig.update_layout(
+                height=600,
+                showlegend=True,
+                hovermode="x unified"
+            )
+            
             st.plotly_chart(fig, use_container_width=True)
         
+        with tab3:
+            # Candlestick chart (requires OHLC data - using simple approximation here)
+            if len(df) > 7:  # Need enough data points for meaningful candlesticks
+                # Group by week for candlesticks
+                df_candle = df.copy()
+                df_candle['week'] = df_candle['date'].dt.isocalendar().week
+                df_candle = df_candle.groupby('week').agg({
+                    'price': ['first', 'max', 'min', 'last']
+                }).reset_index()
+                df_candle.columns = ['week', 'open', 'high', 'low', 'close']
+                
+                fig = go.Figure(go.Candlestick(
+                    x=df_candle['week'],
+                    open=df_candle['open'],
+                    high=df_candle['high'],
+                    low=df_candle['low'],
+                    close=df_candle['close'],
+                    name='Candlestick'
+                ))
+                
+                fig.update_layout(
+                    title=f"{selected_crypto} Weekly Candlestick Chart",
+                    yaxis_title="Price (USD)",
+                    xaxis_title="Week",
+                    height=500
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning("Not enough data points for candlestick chart. Please select a longer timeframe.")
+        
         # Price statistics
-        st.subheader("Price Statistics")
-        current_price = df["price"].iloc[-1]
-        price_change = ((current_price - df["price"].iloc[0]) / df["price"].iloc[0]) * 100
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric("Current Price", f"${current_price:.2f}")
-        
-        with col2:
-            st.metric(f"{timeframe} Change", f"{price_change:.2f}%", 
-                    delta=f"{price_change:.2f}%")
-        
-        with col3:
-            st.metric("All-Time High", f"${df['price'].max():.2f}")
-        
-        with col4:
-            volatility = df["price"].pct_change().std() * 100
-            st.metric("Volatility", f"{volatility:.2f}%")
-    
-    else:
-        st.warning(f"No data available for {selected_crypto}. Please check your internet connection or try again later.")
-
-# Comparison Page
-elif page == "Comparison":
-    st.header("Cryptocurrency Comparison")
-    
-    # Select cryptocurrencies to compare
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        crypto1 = st.selectbox("Select First Cryptocurrency", list(popular_cryptos.keys()), index=0)
-    
-    with col2:
-        crypto2 = st.selectbox("Select Second Cryptocurrency", list(popular_cryptos.keys()), index=1)
-    
-    with col3:
-        timeframe = st.selectbox("Select Timeframe", ["30 days", "90 days", "1 year"], index=0)
-    
-    timeframe_days = {
-        "30 days": 30,
-        "90 days": 90,
-        "1 year": 365
-    }
-    
-    # Get data
-    df1 = get_crypto_data(popular_cryptos[crypto1], timeframe_days[timeframe])
-    df2 = get_crypto_data(popular_cryptos[crypto2], timeframe_days[timeframe])
-    
-    if not df1.empty and not df2.empty:
-        # Normalize data for comparison (starting from 100)
-        df1['normalized'] = 100 * (df1['price'] / df1['price'].iloc[0])
-        df2['normalized'] = 100 * (df2['price'] / df2['price'].iloc[0])
-        
-        # Comparison chart
-        st.subheader(f"Price Comparison: {crypto1} vs {crypto2}")
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df1['date'], y=df1['normalized'], mode='lines', name=crypto1))
-        fig.add_trace(go.Scatter(x=df2['date'], y=df2['normalized'], mode='lines', name=crypto2))
-        fig.update_layout(title=f"Normalized Price Comparison (Base 100)",
-                        xaxis_title="Date", yaxis_title="Normalized Price")
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Correlation analysis
-        st.subheader("Correlation Analysis")
-        
-        # Merge dataframes for correlation
-        df_merge = pd.merge(df1, df2, on='date', suffixes=('_1', '_2'))
-        corr = df_merge['price_1'].corr(df_merge['price_2'])
+        st.markdown("<h3 class='subheader'>Price Statistics</h3>", unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
         
         with col1:
-            st.metric("Price Correlation", f"{corr:.2f}")
+            st.markdown("<h4>Daily Returns Distribution</h4>", unsafe_allow_html=True)
             
-            # Scatter plot
-            fig = px.scatter(df_merge, x='price_1', y='price_2', trendline="ols",
-                            title=f"{crypto1} vs {crypto2} Price Correlation",
-                            labels={'price_1': f"{crypto1} Price (USD)", 'price_2': f"{crypto2} Price (USD)"})
+            returns = df['price'].pct_change().dropna()
+            
+            fig = px.histogram(
+                x=returns,
+                nbins=50,
+                title="Distribution of Daily Returns",
+                labels={'x': 'Daily Return'}
+            )
+            
+            fig.update_layout(
+                height=400,
+                showlegend=False
+            )
+            
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            # Performance comparison
-            perf1 = ((df1['price'].iloc[-1] - df1['price'].iloc[0]) / df1['price'].iloc[0]) * 100
-            perf2 = ((df2['price'].iloc[-1] - df2['price'].iloc[0]) / df2['price'].iloc[0]) * 100
+            st.markdown("<h4>Volatility Analysis</h4>", unsafe_allow_html=True)
             
-            st.metric(f"{crypto1} {timeframe} Performance", f"{perf1:.2f}%", delta=f"{perf1:.2f}%")
-            st.metric(f"{crypto2} {timeframe} Performance", f"{perf2:.2f}%", delta=f"{perf2:.2f}%")
+            rolling_volatility = returns.rolling(window=7).std() * np.sqrt(7)
             
-            # Volatility comparison
-            vol1 = df1["price"].pct_change().std() * 100
-            vol2 = df2["price"].pct_change().std() * 100
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(
+                x=df['date'].iloc[7:],
+                y=rolling_volatility.iloc[7:],
+                name='7-day Rolling Volatility'
+            ))
             
-            st.metric(f"{crypto1} Volatility", f"{vol1:.2f}%")
-            st.metric(f"{crypto2} Volatility", f"{vol2:.2f}%")
+            fig.update_layout(
+                yaxis_title="Volatility",
+                height=400
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Volatility metrics
+            st.markdown("<div style='display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 20px;'>", unsafe_allow_html=True)
+            st.markdown(display_metric("Avg Daily Return", f"{returns.mean() * 100:.2f}%"), unsafe_allow_html=True)
+            st.markdown(display_metric("Annualized Volatility", f"{returns.std() * np.sqrt(365) * 100:.2f}%"), unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
     
     else:
-        st.warning("No data available for comparison. Please check your internet connection or try again later.")
-
-# Portfolio Tracker Page
-elif page == "Portfolio Tracker":
-    st.header("Portfolio Tracker")
-    
-    # Initialize session state
-    if 'portfolio' not in st.session_state:
-        st.session_state.portfolio = []
-    
-    # Form to add cryptocurrency to portfolio
-    st.subheader("Add Cryptocurrency to Portfolio")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        crypto_name = st.selectbox("Select Cryptocurrency", list(popular_cryptos.keys()))
-    
-    with col2:
-        quantity = st.number_input("Quantity", min_value=0.0, step=0.01)
-    
-    with col3:
-        purchase_price = st.number_input("Purchase Price (USD)", min_value=0.0, step=0.01)
-    
-    with col4:
-        purchase_date = st.date_input("Purchase Date", value=datetime.now())
-    
-    if st.button("Add to Portfolio"):
-        # Add to portfolio
-        crypto_id = popular_cryptos[crypto_name]
-        
-        # Get current price
-        df = get_crypto_data(crypto_id, days=1)
-        if not df.empty:
-            current_price = df["price"].iloc[-1]
-            
-            # Calculate current value
-            current_value = quantity * current_price
-            purchase_value = quantity * purchase_price
-            profit_loss = current_value - purchase_value
-            profit_loss_percentage = (profit_loss / purchase_value) * 100 if purchase_value > 0 else 0
-            
-            # Add to portfolio
-            st.session_state.portfolio.append({
-                "crypto_name": crypto_name,
-                "crypto_id": crypto_id,
-                "quantity": quantity,
-                "purchase_price": purchase_price,
-                "purchase_date": purchase_date,
-                "current_price": current_price,
-                "current_value": current_value,
-                "profit_loss": profit_loss,
-                "profit_loss_percentage": profit_loss_percentage
-            })
-            
-            st.success(f"Added {quantity} {crypto_name} to your portfolio!")
-        else:
-            st.error(f"Failed to fetch current price for {crypto_name}.")
-    
-    # Display portfolio
-    if st.session_state.portfolio:
-        st.subheader("Your Portfolio")
-        
-        # Create portfolio dataframe
-        portfolio_df = pd.DataFrame(st.session_state.portfolio)
-        
-        # Display portfolio stats
-        total_value = portfolio_df["current_value"].sum()
-        total_cost = (portfolio_df["quantity"] * portfolio_df["purchase_price"]).sum()
-        total_profit_loss = portfolio_df["profit_loss"].sum()
-        total_profit_loss_percentage = (total_profit_loss / total_cost) * 100 if total_cost > 0 else 0
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Total Portfolio Value", f"${total_value:.2f}")
-        
-        with col2:
-            st.metric("Total Investment", f"${total_cost:.2f}")
-        
-        with col3:
-            st.metric("Total Profit/Loss", f"${total_profit_loss:.2f}", 
-                    delta=f"{total_profit_loss_percentage:.2f}%")
-        
-        # Display portfolio table
-        display_df = portfolio_df[["crypto_name", "quantity", "purchase_price", "current_price", 
-                                "current_value", "profit_loss", "profit_loss_percentage"]].copy()
-        
-        display_df.columns = ["Cryptocurrency", "Quantity", "Purchase Price (USD)", "Current Price (USD)", 
-                            "Current Value (USD)", "Profit/Loss (USD)", "Profit/Loss (%)"]
-        
-        # Format the values
-        display_df["Purchase Price (USD)"] = display_df["Purchase Price (USD)"].apply(lambda x: f"${x:.2f}")
-        display_df["Current Price (USD)"] = display_df["Current Price (USD)"].apply(lambda x: f"${x:.2f}")
-        display_df["Current Value (USD)"] = display_df["Current Value (USD)"].apply(lambda x: f"${x:.2f}")
-        display_df["Profit/Loss (USD)"] = display_df["Profit/Loss (USD)"].apply(lambda x: f"${x:.2f}")
-        display_df["Profit/Loss (%)"] = display_df["Profit/Loss (%)"].apply(lambda x: f"{x:.2f}%")
-        
-        st.dataframe(display_df, use_container_width=True)
-        
-        # Portfolio Distribution
-        st.subheader("Portfolio Distribution")
-        fig = px.pie(portfolio_df, values='current_value', names='crypto_name', 
-                    title='Portfolio Asset Allocation')
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Clear portfolio button
-        if st.button("Clear Portfolio"):
-            st.session_state.portfolio = []
-            st.success("Portfolio cleared!")
-    else:
-        st.info("Your portfolio is empty. Add some cryptocurrencies to track them.")
-        
-        # Sample portfolio demo
-        if st.button("Load Sample Portfolio"):
-            # Bitcoin
-            crypto_id = popular_cryptos["Bitcoin"]
-            df = get_crypto_data(crypto_id, days=1)
-            if not df.empty:
-                current_price = df["price"].iloc[-1]
-                quantity = 0.5
-                purchase_price = current_price * 0.9  # 10% lower than current price
-                current_value = quantity * current_price
-                purchase_value = quantity * purchase_price
-                profit_loss = current_value - purchase_value
-                profit_loss_percentage = (profit_loss / purchase_value) * 100
-                
-                st.session_state.portfolio.append({
-                    "crypto_name": "Bitcoin",
-                    "crypto_id": crypto_id,
-                    "quantity": quantity,
-                    "purchase_price": purchase_price,
-                    "purchase_date": datetime.now() - timedelta(days=30),
-                    "current_price": current_price,
-                    "current_value": current_value,
-                    "profit_loss": profit_loss,
-                    "profit_loss_percentage": profit_loss_percentage
-                })
-            
-            # Ethereum
-            crypto_id = popular_cryptos["Ethereum"]
-            df = get_crypto_data(crypto_id, days=1)
-            if not df.empty:
-                current_price = df["price"].iloc[-1]
-                quantity = 3.0
-                purchase_price = current_price * 0.95  # 5% lower than current price
-                current_value = quantity * current_price
-                purchase_value = quantity * purchase_price
-                profit_loss = current_value - purchase_value
-                profit_loss_percentage = (profit_loss / purchase_value) * 100
-                
-                st.session_state.portfolio.append({
-                    "crypto_name": "Ethereum",
-                    "crypto_id": crypto_id,
-                    "quantity": quantity,
-                    "purchase_price": purchase_price,
-                    "purchase_date": datetime.now() - timedelta(days=14),
-                    "current_price": current_price,
-                    "current_value": current_value,
-                    "profit_loss": profit_loss,
-                    "profit_loss_percentage": profit_loss_percentage
-                })
-            
-            # Cardano
-            crypto_id = popular_cryptos["Cardano"]
-            df = get_crypto_data(crypto_id, days=1)
-            if not df.empty:
-                current_price = df["price"].iloc[-1]
-                quantity = 1000.0
-                purchase_price = current_price * 1.05  # 5% higher than current price
-                current_value = quantity * current_price
-                purchase_value = quantity * purchase_price
-                profit_loss = current_value - purchase_value
-                profit_loss_percentage = (profit_loss / purchase_value) * 100
-                
-                st.session_state.portfolio.append({
-                    "crypto_name": "Cardano",
-                    "crypto_id": crypto_id,
-                    "quantity": quantity,
-                    "purchase_price": purchase_price,
-                    "purchase_date": datetime.now() - timedelta(days=7),
-                    "current_price": current_price,
-                    "current_value": current_value,
-                    "profit_loss": profit_loss,
-                    "profit_loss_percentage": profit_loss_percentage
-                })
-            
-            st.success("Sample portfolio loaded!")
-
-# Add footer
-st.markdown("---")
-st.markdown("📊 Crypto Dashboard - Built with Streamlit")
+        st.warning(f"Could not fetch data for {selected_crypto}. Please try again later.")
