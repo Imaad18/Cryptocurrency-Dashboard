@@ -86,6 +86,44 @@ st.markdown("""
         color: #666666;
     }
     
+    /* News cards */
+    .news-card {
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        background-color: #f9f9f9;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .news-title {
+        font-weight: bold;
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    .news-source {
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
+    /* Calendar events */
+    .event-card {
+        border-left: 4px solid #1E88E5;
+        padding: 0.8rem;
+        margin-bottom: 0.8rem;
+        background-color: #f9f9f9;
+        border-radius: 0 8px 8px 0;
+    }
+    
+    .event-title {
+        font-weight: bold;
+    }
+    
+    .event-date {
+        color: #666;
+        font-size: 0.9rem;
+    }
+    
     /* Make the page more readable on mobile */
     @media (max-width: 768px) {
         .main-header {
@@ -119,7 +157,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     st.markdown("<div class='sidebar-content'>", unsafe_allow_html=True)
-    page = st.radio("", ["📈 Overview", "💹 Price Analysis", "🔄 Comparison", "💼 Portfolio Tracker"])
+    page = st.radio("", ["📈 Overview", "💹 Price Analysis", "🔄 Comparison", "📰 Crypto News", "📅 Crypto Calendar", "💼 Portfolio Tracker"])
     page = page.split(" ")[1]  # Extract the page name without emoji
     
     # Theme selector
@@ -152,6 +190,13 @@ with st.sidebar:
             .main-header {
                 color: #bb86fc;
             }
+            .news-card, .event-card {
+                background-color: #1e1e1e;
+                color: #f1f1f1;
+            }
+            .news-source, .event-date {
+                color: #aaa !important;
+            }
         </style>
         """, unsafe_allow_html=True)
     elif theme == "Blue":
@@ -181,6 +226,14 @@ with st.sidebar:
             }
             .main-header {
                 color: #E3F2FD;
+            }
+            .news-card, .event-card {
+                background-color: rgba(255, 255, 255, 0.1);
+                color: #ffffff;
+                backdrop-filter: blur(10px);
+            }
+            .news-source, .event-date {
+                color: #ddd !important;
             }
         </style>
         """, unsafe_allow_html=True)
@@ -384,6 +437,98 @@ def create_sample_portfolio():
     })
     
     return portfolio
+
+# Function to get crypto news (without API)
+def get_crypto_news():
+    # This is a static list of news - in a real app you would fetch from an API
+    news = [
+        {
+            "title": "Bitcoin Halving Event Completed Successfully",
+            "source": "CoinDesk",
+            "date": "2023-05-15",
+            "summary": "The fourth Bitcoin halving has reduced the block reward from 6.25 BTC to 3.125 BTC, potentially impacting miner profitability and supply dynamics."
+        },
+        {
+            "title": "Ethereum Foundation Announces Major Protocol Upgrade",
+            "source": "The Block",
+            "date": "2023-05-10",
+            "summary": "The upcoming Ethereum upgrade, codenamed 'Dencun', will introduce proto-danksharding to improve scalability and reduce transaction costs."
+        },
+        {
+            "title": "SEC Approves First Spot Bitcoin ETFs",
+            "source": "Bloomberg Crypto",
+            "date": "2023-05-05",
+            "summary": "After years of rejections, the SEC has approved multiple spot Bitcoin ETFs, providing traditional investors with easier access to cryptocurrency."
+        },
+        {
+            "title": "Solana Network Experiences Temporary Outage",
+            "source": "Decrypt",
+            "date": "2023-05-01",
+            "summary": "The Solana blockchain was down for approximately 4 hours due to a bug in the validator software, raising concerns about network stability."
+        },
+        {
+            "title": "Binance CEO Steps Down in $4.3 Billion Settlement with US Authorities",
+            "source": "Reuters",
+            "date": "2023-04-28",
+            "summary": "Changpeng Zhao has pleaded guilty to violating US anti-money laundering laws and stepped down as CEO of Binance in a landmark settlement."
+        },
+        {
+            "title": "BlackRock Files for Spot Ethereum ETF",
+            "source": "CNBC",
+            "date": "2023-04-25",
+            "summary": "The world's largest asset manager has filed paperwork with the SEC to launch a spot Ethereum ETF, following its successful Bitcoin ETF launch."
+        }
+    ]
+    return news
+
+# Function to get crypto calendar events
+def get_crypto_calendar():
+    # This is a static list of events - in a real app you would fetch from an API
+    events = [
+        {
+            "title": "Ethereum Pectra Upgrade",
+            "date": "2024-11-01",
+            "description": "Major upgrade including EIP-3074 (account abstraction) and EIP-7251 (staking changes)",
+            "coin": "Ethereum",
+            "type": "Protocol Upgrade"
+        },
+        {
+            "title": "Solana Token Unlock",
+            "date": "2024-06-15",
+            "description": "Release of 50M SOL tokens (approx $5B) from early investors and team allocations",
+            "coin": "Solana",
+            "type": "Token Unlock"
+        },
+        {
+            "title": "Avalanche Summit 2024",
+            "date": "2024-09-10",
+            "description": "Annual developer conference with expected announcements about Avalanche roadmap",
+            "coin": "Avalanche",
+            "type": "Conference"
+        },
+        {
+            "title": "Bitcoin Taproot Activation Anniversary",
+            "date": "2024-11-14",
+            "description": "Celebration of Bitcoin's last major upgrade improving privacy and efficiency",
+            "coin": "Bitcoin",
+            "type": "Anniversary"
+        },
+        {
+            "title": "Polygon zkEVM Mainnet Beta",
+            "date": "2024-07-22",
+            "description": "Full launch of Polygon's zero-knowledge EVM compatible rollup",
+            "coin": "Polygon",
+            "type": "Mainnet Launch"
+        },
+        {
+            "title": "Cosmos Hub Governance Proposal Voting",
+            "date": "2024-08-05",
+            "description": "Community voting on proposal to reduce inflation rate from 14% to 10%",
+            "coin": "Cosmos",
+            "type": "Governance"
+        }
+    ]
+    return events
 
 # Overview Page
 if page == "Overview":
@@ -782,8 +927,79 @@ elif page == "Comparison":
     else:
         st.info("Please select at least one cryptocurrency to compare.")
 
+# Crypto News Page
+elif page == "News":
+    st.markdown("<h2 class='subheader'>Latest Cryptocurrency News</h2>", unsafe_allow_html=True)
+    
+    # Get news data
+    news_items = get_crypto_news()
+    
+    # Display news cards
+    for news in news_items:
+        st.markdown(f"""
+        <div class="news-card">
+            <div class="news-title">{news['title']}</div>
+            <div>{news['summary']}</div>
+            <div class="news-source">{news['source']} • {news['date']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Add a refresh button (though it won't actually fetch new data in this implementation)
+    if st.button("Refresh News"):
+        st.rerun()
+
+# Crypto Calendar Page
+elif page == "Calendar":
+    st.markdown("<h2 class='subheader'>Cryptocurrency Events Calendar</h2>", unsafe_allow_html=True)
+    
+    # Get calendar events
+    events = get_crypto_calendar()
+    
+    # Filter options
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        filter_coin = st.selectbox("Filter by Coin", ["All"] + list(popular_cryptos.keys()))
+    
+    with col2:
+        filter_type = st.selectbox("Filter by Event Type", ["All", "Protocol Upgrade", "Token Unlock", "Conference", "Mainnet Launch", "Governance"])
+    
+    # Apply filters
+    filtered_events = events
+    if filter_coin != "All":
+        filtered_events = [e for e in filtered_events if e['coin'] == filter_coin]
+    if filter_type != "All":
+        filtered_events = [e for e in filtered_events if e['type'] == filter_type]
+    
+    # Display events
+    if filtered_events:
+        for event in filtered_events:
+            st.markdown(f"""
+            <div class="event-card">
+                <div class="event-title">{event['title']}</div>
+                <div>{event['description']}</div>
+                <div class="event-date">
+                    <span style="margin-right: 20px;">📅 {event['date']}</span>
+                    <span style="margin-right: 20px;">🪙 {event['coin']}</span>
+                    <span>🏷️ {event['type']}</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("No events match your filters.")
+    
+    # Add a legend
+    with st.expander("Event Types Legend"):
+        st.markdown("""
+        - **Protocol Upgrade**: Major network upgrades or hard forks
+        - **Token Unlock**: Scheduled release of locked tokens
+        - **Conference**: Major industry events and hackathons
+        - **Mainnet Launch**: New blockchain networks going live
+        - **Governance**: Important community votes and proposals
+        """)
+
 # Portfolio Tracker Page
-elif page == "Portfolio Tracker":
+elif page == "Portfolio":
     st.markdown("<h2 class='subheader'>Cryptocurrency Portfolio Tracker</h2>", unsafe_allow_html=True)
     
     # Initialize session state for portfolio
