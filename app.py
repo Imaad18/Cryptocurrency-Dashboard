@@ -1,3 +1,4 @@
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,7 +8,6 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from PIL import Image
-from plotly.subplots import make_subplots
 
 # Set page config
 st.set_page_config(
@@ -203,6 +203,7 @@ with st.sidebar:
         Data is provided by CoinGecko API and may not be real-time.
         """)
 
+
 # Function to get crypto data using CoinGecko API
 @st.cache_data(ttl=300)  # Cache data for 5 minutes
 def get_crypto_data(coin_id, days=30):
@@ -239,8 +240,10 @@ def get_crypto_data(coin_id, days=30):
         st.error(f"Error fetching data: {e}")
         return pd.DataFrame()
 
+# Replace your current get_data_with_progress and caching implementation with this:
+
 # Function to get top cryptocurrencies
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=300, show_spinner="Fetching market data...")
 def get_top_cryptos(limit=50):
     try:
         url = "https://api.coingecko.com/api/v3/coins/markets"
@@ -270,6 +273,42 @@ def get_top_cryptos(limit=50):
         st.error(f"Error fetching top cryptocurrencies: {e}")
         return pd.DataFrame()
 
+# Function to get crypto data using CoinGecko API
+@st.cache_data(ttl=300, show_spinner="Fetching cryptocurrency data...")
+def get_crypto_data(coin_id, days=30):
+    try:
+        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+        params = {
+            "vs_currency": "usd",
+            "days": days,
+            "interval": "daily"
+        }
+        headers = {
+            "Accept": "application/json",
+            "User-Agent": "CryptoTrack Dashboard"
+        }
+        response = requests.get(url, params=params, headers=headers)
+        
+        if response.status_code == 429:
+            st.warning("API rate limit reached. Using cached data if available or trying again shortly...")
+            return pd.DataFrame()
+        
+        if response.status_code != 200:
+            st.warning(f"API error: {response.status_code}. Using cached data if available.")
+            return pd.DataFrame()
+        
+        data = response.json()
+        
+        # Convert price data to DataFrame
+        df = pd.DataFrame(data["prices"], columns=["timestamp", "price"])
+        df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
+        df = df[["date", "price"]]
+        
+        return df
+    except Exception as e:
+        st.error(f"Error fetching data: {e}")
+        return pd.DataFrame()
+
 # Dictionary of popular cryptocurrencies with their IDs
 popular_cryptos = {
     "Bitcoin": "bitcoin",
@@ -290,6 +329,7 @@ popular_cryptos = {
 }
 
 # Show loading spinner for data fetching
+@st.cache_data
 def get_data_with_progress(func, *args, **kwargs):
     """Wrapper function to show loading spinner"""
     with st.spinner(f"Fetching data..."):
@@ -409,6 +449,7 @@ def create_demo_data():
     }
     return pd.DataFrame(demo_data)
 
+
 # Overview Page
 if page == "Overview":
     st.markdown("<h2 class='subheader'>Cryptocurrency Market Overview</h2>", unsafe_allow_html=True)
@@ -416,7 +457,7 @@ if page == "Overview":
     # Show loading animation while fetching data
     with st.spinner("Fetching market data..."):
         # Load top cryptocurrencies data
-        top_cryptos = get_data_with_progress(get_top_cryptos, limit=25)
+        top_cryptos = get_top_cryptos(limit=25)
     
     if not top_cryptos.empty:
         # Display market stats
@@ -428,8 +469,7 @@ if page == "Overview":
         
         # 24h Volume
         volume_sum = int(top_cryptos['total_volume'].sum() / 1e9)
-        st.markdown(display_metric("24h Volume", f"{_dtypes: object
-f"{volume_sum:,}B", prefix="$"), unsafe_allow_html=True)
+        st.markdown(display_metric("24h Volume", f"{volume_sum:,}B", prefix="$"), unsafe_allow_html=True)
         
         # Bitcoin Dominance
         btc_data = top_cryptos[top_cryptos['id'] == 'bitcoin']
@@ -588,7 +628,7 @@ f"{volume_sum:,}B", prefix="$"), unsafe_allow_html=True)
             )
             fig.update_traces(textposition='inside', textinfo='percent+label')
             fig.update_layout(
-                legend=dict( compression="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
                 margin=dict(l=20, r=20, t=60, b=60)
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -889,13 +929,3 @@ elif page == "Price Analysis":
     
     else:
         st.warning(f"Could not fetch data for {selected_crypto}. Please try again later.")
-
-# Comparison Page (Placeholder)
-elif page == "Comparison":
-    st.markdown("<h2 class='subheader'>Cryptocurrency Comparison</h2>", unsafe_allow_html=True)
-    st.info("Comparison page is under development. Please check back later.")
-
-# Portfolio Tracker Page (Placeholder)
-elif page == "Portfolio Tracker":
-    st.markdown("<h2 class='subheader'>Portfolio Tracker</h2>", unsafe_allow_html=True)
-    st.info("Portfolio Tracker page is under development. Please check back later.")
