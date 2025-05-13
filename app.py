@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -8,6 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 from PIL import Image
+from plotly.subplots import make_subplots
 
 # Set page config
 st.set_page_config(
@@ -203,7 +203,6 @@ with st.sidebar:
         Data is provided by CoinGecko API and may not be real-time.
         """)
 
-
 # Function to get crypto data using CoinGecko API
 @st.cache_data(ttl=300)  # Cache data for 5 minutes
 def get_crypto_data(coin_id, days=30):
@@ -291,7 +290,6 @@ popular_cryptos = {
 }
 
 # Show loading spinner for data fetching
-@st.cache_data
 def get_data_with_progress(func, *args, **kwargs):
     """Wrapper function to show loading spinner"""
     with st.spinner(f"Fetching data..."):
@@ -411,7 +409,6 @@ def create_demo_data():
     }
     return pd.DataFrame(demo_data)
 
-
 # Overview Page
 if page == "Overview":
     st.markdown("<h2 class='subheader'>Cryptocurrency Market Overview</h2>", unsafe_allow_html=True)
@@ -431,7 +428,8 @@ if page == "Overview":
         
         # 24h Volume
         volume_sum = int(top_cryptos['total_volume'].sum() / 1e9)
-        st.markdown(display_metric("24h Volume", f"{volume_sum:,}B", prefix="$"), unsafe_allow_html=True)
+        st.markdown(display_metric("24h Volume", f"{_dtypes: object
+f"{volume_sum:,}B", prefix="$"), unsafe_allow_html=True)
         
         # Bitcoin Dominance
         btc_data = top_cryptos[top_cryptos['id'] == 'bitcoin']
@@ -590,7 +588,7 @@ if page == "Overview":
             )
             fig.update_traces(textposition='inside', textinfo='percent+label')
             fig.update_layout(
-                legend=dict(orientation="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
+                legend=dict( compression="h", yanchor="bottom", y=-0.2, xanchor="center", x=0.5),
                 margin=dict(l=20, r=20, t=60, b=60)
             )
             st.plotly_chart(fig, use_container_width=True)
@@ -891,3 +889,13 @@ elif page == "Price Analysis":
     
     else:
         st.warning(f"Could not fetch data for {selected_crypto}. Please try again later.")
+
+# Comparison Page (Placeholder)
+elif page == "Comparison":
+    st.markdown("<h2 class='subheader'>Cryptocurrency Comparison</h2>", unsafe_allow_html=True)
+    st.info("Comparison page is under development. Please check back later.")
+
+# Portfolio Tracker Page (Placeholder)
+elif page == "Portfolio Tracker":
+    st.markdown("<h2 class='subheader'>Portfolio Tracker</h2>", unsafe_allow_html=True)
+    st.info("Portfolio Tracker page is under development. Please check back later.")
