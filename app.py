@@ -1,11 +1,9 @@
-"""
-Enhanced CryptoInsight Analytics Dashboard
-- Complete implementation with all missing functions
-- Improved error handling and API rate limiting
-- Enhanced visualizations and better defaults
-- Fully functional demo data generation
-- Performance optimizations and structural improvements
-"""
+# Enhanced CryptoInsight Analytics Dashboard
+# - Complete implementation with all missing functions
+# - Improved error handling and API rate limiting
+# - Enhanced visualizations and better defaults
+# - Fully functional demo data generation
+# - Performance optimizations and structural improvements
 
 # Setup & Configuration:
 import streamlit as st
@@ -24,7 +22,6 @@ import requests
 import warnings
 import time
 import random
-from faker import Faker
 
 # Suppress warnings
 warnings.filterwarnings('ignore')
@@ -42,9 +39,6 @@ PLOT_BG = '#1E1E1E'
 ACCENT_COLOR = '#FF4B4B'
 SUCCESS_COLOR = '#0ECB81'
 WARNING_COLOR = '#F0B90B'
-
-# Initialize Faker for demo data
-fake = Faker()
 
 # Configure Streamlit
 st.set_page_config(
@@ -107,9 +101,79 @@ def local_css(file_name=None):
             </style>
         """, unsafe_allow_html=True)
 
+# Demo Data Generation
+def generate_demo_data(n_transactions=1000):
+    """Generate synthetic cryptocurrency transaction data."""
+    np.random.seed(42)
+    random.seed(42)
+    
+    # Generate timestamps (last 90 days)
+    end_date = datetime.now()
+    start_date = end_date - timedelta(days=90)
+    timestamps = [start_date + timedelta(seconds=random.randint(0, int((end_date - start_date).total_seconds()))) 
+                  for _ in range(n_transactions)]
+    
+    # Generate addresses
+    def generate_address():
+        return '0x' + ''.join(random.choices('0123456789abcdef', k=40))
+    
+    addresses = [generate_address() for _ in range(n_transactions * 2)]
+    senders = random.choices(addresses, k=n_transactions)
+    receivers = random.choices(addresses, k=n_transactions)
+    
+    # Ensure sender != receiver
+    for i in range(n_transactions):
+        while senders[i] == receivers[i]:
+            receivers[i] = generate_address()
+    
+    # Generate transaction data
+    currencies = random.choices(['BTC', 'ETH'], weights=[0.6, 0.4], k=n_transactions)
+    amounts = np.random.lognormal(mean=0, sigma=2, size=n_transactions)
+    amounts = np.clip(amounts, 0.0001, 1000)  # Limit range for realism
+    
+    # Transaction fees (dependent on currency)
+    fees = []
+    gas_prices = []
+    for i, currency in enumerate(currencies):
+        if currency == 'BTC':
+            fee = amounts[i] * random.uniform(0.0001, 0.005)  # 0.01% to 0.5% of amount
+            gas_price = 0
+        else:  # ETH
+            fee = amounts[i] * random.uniform(0.001, 0.01)  # 0.1% to 1% of amount
+            gas_price = random.uniform(20, 200)  # Gas price in Gwei
+        fees.append(fee)
+        gas_prices.append(gas_price)
+    
+    # Transaction status and type
+    statuses = random.choices(['Confirmed', 'Pending', 'Failed'], weights=[0.9, 0.08, 0.02], k=n_transactions)
+    types = random.choices(['Transfer', 'Contract', 'Swap'], weights=[0.7, 0.2, 0.1], k=n_transactions)
+    
+    # Mining pools
+    mining_pools = random.choices(['Antpool', 'F2Pool', 'Poolin', 'Binance Pool', 'ViaBTC',
+                                  'SlushPool', 'BTC.com', 'Foundry USA', 'SBI Crypto', 'Luxor'],
+                                 k=n_transactions)
+    
+    # Create DataFrame
+    data = pd.DataFrame({
+        'Timestamp': timestamps,
+        'Currency': currencies,
+        'Amount': amounts,
+        'Transaction_Fee': fees,
+        'Sender_Address': senders,
+        'Receiver_Address': receivers,
+        'Transaction_Status': statuses,
+        'Transaction_Type': types,
+        'Transaction_ID': ['tx_' + ''.join(random.choices('0123456789abcdef', k=64)) for _ in range(n_transactions)],
+        'Gas_Price_Gwei': gas_prices,
+        'Mining_Pool': mining_pools
+    })
+    
+    # Add Transaction_Hash
+    data['Transaction_Hash'] = data['Transaction_ID']
+    
+    return data
 
 # Data Processing:
-
 class CryptoDataPreprocessor:
     """Class to preprocess and analyze cryptocurrency transaction data."""
     
@@ -283,9 +347,7 @@ class CryptoDataPreprocessor:
             self.preprocess()
         return self.data, self.btc_data, self.eth_data
 
-
 # Real Time Price Data
-
 def get_crypto_prices():
     """Fetch current crypto prices from CoinGecko API with rate limiting."""
     url = "https://api.coingecko.com/api/v3/coins/markets"
@@ -404,7 +466,6 @@ def get_crypto_prices():
                 'image': ''
             }
         }
-
 
 def show_price_tab():
     """Display cryptocurrency price information and charts."""
@@ -569,9 +630,7 @@ def show_price_tab():
     else:
         st.warning("Historical price data is not available")
 
-
 # Mining Pool Analysis
-
 def analyze_mining_pools(data):
     """Analyze mining pool activity."""
     st.header("⛏️ Mining Pool Analysis")
@@ -580,7 +639,7 @@ def analyze_mining_pools(data):
         st.warning("No mining pool data available. Using demo mining pool data.")
         # Generate synthetic mining pool data for demo
         random_pools = ['Antpool', 'F2Pool', 'Poolin', 'Binance Pool', 'ViaBTC', 
-                         'SlushPool', 'BTC.com', 'Foundry USA', 'SBI Crypto', 'Luxor']
+                        'SlushPool', 'BTC.com', 'Foundry USA', 'SBI Crypto', 'Luxor']
         data['Mining_Pool'] = np.random.choice(random_pools, size=len(data))
     
     # Pool statistics
@@ -648,7 +707,7 @@ def analyze_mining_pools(data):
     ).reset_index()
     
     # Fill NaN values from std calc when only one day of data
-    pool_efficiency.fillna(0, inplace=True)
+    pool_efficiency.fill(0, inplace=True)
     
     # Efficiency scatter plot
     eff_col1, eff_col2 = st.columns([3, 1])
@@ -763,9 +822,7 @@ def analyze_mining_pools(data):
     
     return pool_counts
 
-
 # Transaction Fee Analysis
-
 def analyze_transaction_fees(data):
     """Analyze transaction fees and patterns."""
     st.header("💸 Transaction Fee Analysis")
@@ -1254,9 +1311,7 @@ def analyze_transaction_fees(data):
     
     st.plotly_chart(fig, use_container_width=True)
 
-
 # Address Analysis
-
 def analyze_address_activity(data):
     """Analyze wallet address activity and patterns."""
     st.header("📨 Address Activity Analysis")
@@ -1588,10 +1643,7 @@ def analyze_address_activity(data):
         node_y = []
         node_text = []
         for node in G.nodes():
-            x, y = pos[node]
-            node_x.append(x)
-            node_y.append(y)
-            node_text.append(f"Address: {node[:10]}...")
+            x, y = pos  node_text.append(f"Address: {node[:10]}...")
         
         node_trace = go.Scatter(
             x=node_x, y=node_y,
@@ -1626,3 +1678,56 @@ def analyze_address_activity(data):
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.warning("Insufficient data for network visualization")
+
+# Main Application
+def main():
+    """Main application function."""
+    local_css()
+    
+    st.title("🔍 CryptoInsight Analytics Dashboard")
+    st.markdown("Analyze cryptocurrency transactions, market data, and network patterns")
+    
+    # Sidebar for data input
+    st.sidebar.header("Data Input")
+    data_source = st.sidebar.selectbox("Select Data Source", ["Demo Data", "Upload CSV"])
+    
+    if data_source == "Demo Data":
+        st.sidebar.info("Using synthetic transaction data for demonstration")
+        data = generate_demo_data(n_transactions=1000)
+    else:
+        uploaded_file = st.sidebar.file_uploader("Upload transaction CSV", type=['csv'])
+        if uploaded_file is not None:
+            data = pd.read_csv(uploaded_file)
+        else:
+            st.error("Please upload a CSV file or select Demo Data")
+            return
+    
+    # Initialize preprocessor
+    preprocessor = CryptoDataPreprocessor(data)
+    processed_data, btc_data, eth_data = preprocessor.get_processed_data()
+    
+    # Display data summary
+    preprocessor._summarize_data()
+    
+    # Create tabs
+    tab1, tab2, tab3, tab4 = st.tabs([
+        "Market Data",
+        "Mining Pools",
+        "Transaction Fees",
+        "Address Analysis"
+    ])
+    
+    with tab1:
+        show_price_tab()
+        
+    with tab2:
+        analyze_mining_pools(processed_data)
+        
+    with tab3:
+        analyze_transaction_fees(processed_data)
+        
+    with tab4:
+        analyze_address_activity(processed_data)
+
+if __name__ == "__main__":
+    main()
