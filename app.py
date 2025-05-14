@@ -200,8 +200,13 @@ def forecast_crypto_price(data, days=30):
                 pred = model.predict(future_days.iloc[[i]])[0]
             else:
                 # Update MA values based on previous predictions
-                future_days.at[future_days.index[i], 'MA_7'] = np.mean([*df['Close'].iloc[-6:], *future_prices[-6:]])
-                future_days.at[future_days.index[i], 'MA_30'] = np.mean([*df['Close'].iloc[-29:], *future_prices[-29:] if len(future_prices) > 29 else []])
+                # Fixed the list concatenation syntax here
+                ma_7_values = list(df['Close'].iloc[-6:]) + (future_prices[-6:] if len(future_prices) > 6 else [])
+                future_days.at[future_days.index[i], 'MA_7'] = np.mean(ma_7_values)
+                
+                ma_30_values = list(df['Close'].iloc[-29:]) + (future_prices[-29:] if len(future_prices) > 29 else [])
+                future_days.at[future_days.index[i], 'MA_30'] = np.mean(ma_30_values)
+                
                 pred = model.predict(future_days.iloc[[i]])[0]
             future_prices.append(pred)
         
@@ -217,6 +222,7 @@ def forecast_crypto_price(data, days=30):
     except Exception as e:
         st.error(f"Error in forecasting: {str(e)}")
         return None, None, None, None
+
 
 # Professional sidebar with enhanced features
 def sidebar():
