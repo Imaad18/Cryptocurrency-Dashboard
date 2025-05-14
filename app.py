@@ -10,246 +10,643 @@ import requests
 import time
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error
 import matplotlib.pyplot as plt
 import seaborn as sns
+from PIL import Image
+import io
+import base64
 
-# Set page config
+# Set page config with professional look
 st.set_page_config(
-    page_title="Crypto Analysis Dashboard",
-    page_icon="📊",
+    page_title="CryptoVision Pro",
+    page_icon="💰",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
+    menu_items={
+        'Get Help': 'https://github.com/your-repo',
+        'Report a bug': "https://github.com/your-repo/issues",
+        'About': "# CryptoVision Pro - Advanced Cryptocurrency Analytics"
+    }
 )
 
-# Custom CSS for better UI
+# Custom CSS for professional UI
 def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    try:
+        with open(file_name) as f:
+            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+    except:
+        st.markdown("""
+        <style>
+            /* Main styles */
+            .main {
+                background-color: #f8f9fa;
+            }
+            .stApp {
+                background-color: #f8f9fa;
+            }
+            /* Sidebar */
+            .css-1d391kg {
+                background-color: #2c3e50;
+                color: white;
+            }
+            /* Headers */
+            h1, h2, h3, h4, h5, h6 {
+                color: #2c3e50;
+            }
+            /* Cards */
+            .st-cn {
+                background-color: white;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                padding: 15px;
+                margin-bottom: 20px;
+            }
+            /* Buttons */
+            .st-b7 {
+                background-color: #3498db;
+                color: white;
+            }
+            /* Tabs */
+            .st-cq {
+                border-bottom: 2px solid #3498db;
+            }
+            /* Metrics */
+            .st-emotion-cache-1xarl3l {
+                background-color: white;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                padding: 15px;
+            }
+        </style>
+        """, unsafe_allow_html=True)
 
 local_css("style.css")
 
-# Cache data functions
-@st.cache_data(ttl=3600, show_spinner=False)
+# Cache data functions with enhanced error handling
+@st.cache_data(ttl=3600, show_spinner="Fetching cryptocurrency data...")
 def get_crypto_data(ticker, period="1y"):
     try:
         crypto = yf.Ticker(ticker)
-        hist = crypto.history(period=period)
+        hist = crypto.history(period=period, interval="1d")
+        if hist.empty:
+            st.error(f"No data available for {ticker}")
+            return pd.DataFrame()
         return hist
     except Exception as e:
         st.error(f"Error fetching data for {ticker}: {str(e)}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner="Fetching multiple cryptocurrency data...")
 def get_multiple_cryptos(tickers, period="1y"):
     data = {}
-    for ticker in tickers:
+    progress_bar = st.progress(0)
+    for i, ticker in enumerate(tickers):
         try:
+            progress_bar.progress((i + 1) / len(tickers), text=f"Fetching {ticker}...")
             crypto = yf.Ticker(ticker)
-            hist = crypto.history(period=period)
-            data[ticker] = hist
+            hist = crypto.history(period=period, interval="1d")
+            if not hist.empty:
+                data[ticker] = hist
         except Exception as e:
             st.warning(f"Could not fetch data for {ticker}: {str(e)}")
+    progress_bar.empty()
     return data
 
-@st.cache_data(ttl=3600, show_spinner=False)
+@st.cache_data(ttl=1800, show_spinner="Fetching latest cryptocurrency news...")
 def get_crypto_news():
     try:
-        # Using Yahoo Finance news feed
-        news = yf.Ticker("BTC-USD").news
-        return news[:10]  # Get top 10 news articles
+        # Using multiple sources for news
+        news_items = []
+        
+        # Get Bitcoin news as proxy for general crypto news
+        btc = yf.Ticker("BTC-USD")
+        yf_news = btc.news
+        
+        for item in yf_news[:15]:  # Get more items to filter
+            # Standardize news items
+            news_item = {
+                'title': item.get('title', 'No title available'),
+                'link': item.get('link', '#'),
+                'summary': item.get('summary', '') or item.get('description', 'No summary available'),
+                'provider': item.get('publisher', 'Unknown source'),
+                'published': datetime.fromtimestamp(item.get('providerPublishTime', time.time()) if 'providerPublishTime' in item else None,
+                'thumbnail': item.get('thumbnail', {}).get('resolutions', [{}])[0].get('url', None) if 'thumbnail' in item else None
+            }
+            news_items.append(news_item)
+        
+        # Filter out duplicates and sort by date
+        unique_news = {}
+        for item in news_items:
+            if item['title'] not in unique_news:
+                unique_news[item['title']] = item
+        
+        # Sort by published date (newest first)
+        sorted_news = sorted(unique_news.values(), 
+                           key=lambda x: x['published'] if x['published'] else datetime.min, 
+                           reverse=True)
+        
+        return sorted_news[:10]  # Return top 10 unique news items
+        
     except Exception as e:
         st.error(f"Error fetching news: {str(e)}")
         return []
 
-# Forecasting function
+# Enhanced forecasting function with multiple models
 def forecast_crypto_price(data, days=30):
-    if data.empty:
-        return None, None, None
+    if data.empty or len(data) < 30:  # Need at least 30 days of data
+        return None, None, None, None
     
-    # Prepare data
-    df = data[['Close']].copy()
-    df['Date'] = df.index
-    df['Days'] = (df['Date'] - df['Date'].min()).dt.days
-    df = df[['Days', 'Close']]
+    try:
+        # Prepare data
+        df = data[['Close']].copy()
+        df['Date'] = df.index
+        df['Days'] = (df['Date'] - df['Date'].min()).dt.days
+        df = df[['Days', 'Close']].dropna()
+        
+        # Create additional features
+        df['MA_7'] = df['Close'].rolling(window=7).mean()
+        df['MA_30'] = df['Close'].rolling(window=30).mean()
+        df['Daily_Return'] = df['Close'].pct_change()
+        df = df.dropna()
+        
+        # Split data
+        X = df[['Days', 'MA_7', 'MA_30', 'Daily_Return']]
+        y = df['Close']
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Train model
+        model = RandomForestRegressor(n_estimators=200, random_state=42, n_jobs=-1)
+        model.fit(X_train, y_train)
+        
+        # Predict
+        y_pred = model.predict(X_test)
+        mae = mean_absolute_error(y_test, y_pred)
+        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+        
+        # Future prediction
+        last_day = df['Days'].max()
+        future_days = pd.DataFrame({
+            'Days': range(last_day + 1, last_day + days + 1),
+            'MA_7': df['MA_7'].iloc[-1],
+            'MA_30': df['MA_30'].iloc[-1],
+            'Daily_Return': df['Daily_Return'].iloc[-1]
+        })
+        
+        # Adjust future MA values based on predicted prices
+        future_prices = []
+        for i in range(days):
+            if i == 0:
+                pred = model.predict(future_days.iloc[[i]])[0]
+            else:
+                # Update MA values based on previous predictions
+                future_days.at[future_days.index[i], 'MA_7'] = np.mean([*df['Close'].iloc[-6:], *future_prices[-6:]])
+                future_days.at[future_days.index[i], 'MA_30'] = np.mean([*df['Close'].iloc[-29:], *future_prices[-29:] if len(future_prices) > 29 else []])
+                pred = model.predict(future_days.iloc[[i]])[0]
+            future_prices.append(pred)
+        
+        # Create dates for future predictions
+        last_date = data.index.max()
+        future_dates = pd.date_range(
+            start=last_date + pd.Timedelta(days=1),
+            periods=days
+        )
+        
+        return future_dates, future_prices, mae, rmse
     
-    # Split data
-    X = df[['Days']]
-    y = df['Close']
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    
-    # Train model
-    model = RandomForestRegressor(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-    
-    # Predict
-    y_pred = model.predict(X_test)
-    mae = mean_absolute_error(y_test, y_pred)
-    
-    # Future prediction
-    last_day = df['Days'].max()
-    future_days = pd.DataFrame({'Days': range(last_day + 1, last_day + days + 1)})
-    future_prices = model.predict(future_days)
-    
-    # Create dates for future predictions using pandas date_range
-    last_date = data.index.max()
-    future_dates = pd.date_range(
-        start=last_date + pd.Timedelta(days=1),
-        periods=days
-    )
-    
-    return future_dates, future_prices, mae
+    except Exception as e:
+        st.error(f"Error in forecasting: {str(e)}")
+        return None, None, None, None
 
-# Sidebar
+# Professional sidebar with enhanced features
 def sidebar():
-    st.sidebar.title("Crypto Dashboard")
-    st.sidebar.markdown("Select cryptocurrencies and time period to analyze")
-    
-    # Popular cryptocurrencies
-    crypto_options = {
-        "Bitcoin": "BTC-USD",
-        "Ethereum": "ETH-USD",
-        "Binance Coin": "BNB-USD",
-        "Cardano": "ADA-USD",
-        "Solana": "SOL-USD",
-        "XRP": "XRP-USD",
-        "Polkadot": "DOT-USD",
-        "Dogecoin": "DOGE-USD",
-        "Shiba Inu": "SHIB-USD",
-        "Polygon": "MATIC-USD"
-    }
-    
-    selected_names = st.sidebar.multiselect(
-        "Select Cryptocurrencies",
-        list(crypto_options.keys()),
-        default=["Bitcoin", "Ethereum"]
-    )
-    
-    selected_cryptos = [crypto_options[name] for name in selected_names]
-    
-    # Time period selection
-    time_period = st.sidebar.selectbox(
-        "Select Time Period",
-        options=["1d", "5d", "1mo", "3mo", "6mo", "1y", "2y", "5y", "10y", "max"],
-        index=5
-    )
-    
-    # Forecast days
-    forecast_days = st.sidebar.slider(
-        "Forecast Days",
-        min_value=7,
-        max_value=90,
-        value=30
-    )
-    
-    return selected_cryptos, time_period, forecast_days
+    with st.sidebar:
+        st.image("https://cryptologos.cc/logos/bitcoin-btc-logo.png", width=100)
+        st.title("CryptoVision Pro")
+        st.markdown("---")
+        
+        # Popular cryptocurrencies with logos
+        crypto_options = {
+            "Bitcoin (BTC)": "BTC-USD",
+            "Ethereum (ETH)": "ETH-USD",
+            "Binance Coin (BNB)": "BNB-USD",
+            "Cardano (ADA)": "ADA-USD",
+            "Solana (SOL)": "SOL-USD",
+            "XRP (XRP)": "XRP-USD",
+            "Polkadot (DOT)": "DOT-USD",
+            "Dogecoin (DOGE)": "DOGE-USD",
+            "Shiba Inu (SHIB)": "SHIB-USD",
+            "Polygon (MATIC)": "MATIC-USD",
+            "Litecoin (LTC)": "LTC-USD",
+            "Chainlink (LINK)": "LINK-USD"
+        }
+        
+        selected_names = st.multiselect(
+            "Select Cryptocurrencies",
+            list(crypto_options.keys()),
+            default=["Bitcoin (BTC)", "Ethereum (ETH)"],
+            help="Select multiple cryptocurrencies to compare"
+        )
+        
+        selected_cryptos = [crypto_options[name] for name in selected_names]
+        
+        st.markdown("---")
+        
+        # Time period selection with presets
+        time_period = st.selectbox(
+            "Select Time Period",
+            options=[
+                "1 Week", "1 Month", "3 Months", 
+                "6 Months", "1 Year", "2 Years", 
+                "5 Years", "All Time"
+            ],
+            index=4,
+            help="Select the historical time period to analyze"
+        )
+        
+        # Map selection to Yahoo Finance periods
+        period_map = {
+            "1 Week": "5d",
+            "1 Month": "1mo",
+            "3 Months": "3mo",
+            "6 Months": "6mo",
+            "1 Year": "1y",
+            "2 Years": "2y",
+            "5 Years": "5y",
+            "All Time": "max"
+        }
+        yf_period = period_map[time_period]
+        
+        st.markdown("---")
+        
+        # Forecast settings
+        st.subheader("Forecast Settings")
+        forecast_days = st.slider(
+            "Forecast Horizon (Days)",
+            min_value=7,
+            max_value=90,
+            value=30,
+            step=7,
+            help="Number of days to forecast into the future"
+        )
+        
+        st.markdown("---")
+        
+        # Display market summary
+        st.subheader("Market Summary")
+        try:
+            btc = yf.Ticker("BTC-USD")
+            btc_info = btc.fast_info
+            st.metric("Bitcoin Price", f"${btc_info.last_price:,.2f}", 
+                    f"{btc_info.last_price - btc_info.previous_close:,.2f}")
+            st.metric("24h Change", f"{((btc_info.last_price / btc_info.previous_close - 1) * 100):.2f}%")
+        except:
+            st.warning("Couldn't fetch market data")
+        
+        return selected_cryptos, yf_period, forecast_days
 
-# Price Tab
+# Enhanced Price Tab with professional charts
 def price_tab(selected_cryptos, time_period):
-    st.header("Cryptocurrency Price Analysis")
+    st.header("📈 Cryptocurrency Price Analysis")
+    st.markdown("Analyze historical price trends and performance metrics")
     
     if not selected_cryptos:
         st.warning("Please select at least one cryptocurrency from the sidebar.")
         return
     
-    # Get data for selected cryptos
-    crypto_data = get_multiple_cryptos(selected_cryptos, time_period)
+    with st.spinner("Loading price data..."):
+        crypto_data = get_multiple_cryptos(selected_cryptos, time_period)
     
     if not crypto_data:
         st.error("No data available for the selected cryptocurrencies.")
         return
     
-    # Plot price chart
-    fig = go.Figure()
+    # Create tabs for different chart types
+    chart_tab1, chart_tab2, chart_tab3 = st.tabs(["Interactive Chart", "Candlestick Chart", "Performance Metrics"])
     
-    for ticker, data in crypto_data.items():
-        if not data.empty:
-            fig.add_trace(go.Scatter(
-                x=data.index,
-                y=data['Close'],
-                name=ticker,
-                mode='lines'
-            ))
-    
-    fig.update_layout(
-        title="Cryptocurrency Price Trends",
-        xaxis_title="Date",
-        yaxis_title="Price (USD)",
-        hovermode="x unified",
-        height=600
-    )
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # Show raw data
-    if st.checkbox("Show raw data"):
-        for ticker, data in crypto_data.items():
-            st.subheader(ticker)
-            st.dataframe(data)
-
-# Analysis Tab
-def analysis_tab(selected_cryptos, time_period):
-    st.header("Cryptocurrency Technical Analysis")
-    
-    if not selected_cryptos:
-        st.warning("Please select at least one cryptocurrency from the sidebar.")
-        return
-    
-    # Get data for selected cryptos
-    crypto_data = get_multiple_cryptos(selected_cryptos, time_period)
-    
-    if not crypto_data:
-        st.error("No data available for the selected cryptocurrencies.")
-        return
-    
-    # Calculate daily returns
-    returns_data = {}
-    for ticker, data in crypto_data.items():
-        if not data.empty:
-            returns_data[ticker] = data['Close'].pct_change().dropna()
-    
-    # Plot returns distribution
-    if len(returns_data) > 0:
-        st.subheader("Daily Returns Distribution")
-        fig, ax = plt.subplots(figsize=(10, 6))
+    with chart_tab1:
+        # Plot price chart with enhanced features
+        fig = go.Figure()
         
-        for ticker, returns in returns_data.items():
-            sns.histplot(returns, kde=True, label=ticker, ax=ax)
-        
-        ax.set_title("Distribution of Daily Returns")
-        ax.set_xlabel("Daily Return")
-        ax.set_ylabel("Frequency")
-        ax.legend()
-        
-        st.pyplot(fig)
-    
-    # Correlation matrix
-    if len(selected_cryptos) > 1:
-        st.subheader("Correlation Matrix")
-        
-        # Create a DataFrame with closing prices
-        close_prices = pd.DataFrame()
         for ticker, data in crypto_data.items():
             if not data.empty:
-                close_prices[ticker] = data['Close']
+                fig.add_trace(go.Scatter(
+                    x=data.index,
+                    y=data['Close'],
+                    name=ticker.split("-")[0],
+                    mode='lines',
+                    line=dict(width=2),
+                    hovertemplate="%{y:$,.2f}<extra>%{x|%b %d, %Y}</extra>"
+                ))
         
-        if not close_prices.empty:
-            corr_matrix = close_prices.corr()
+        fig.update_layout(
+            title="Cryptocurrency Price Trends",
+            xaxis_title="Date",
+            yaxis_title="Price (USD)",
+            hovermode="x unified",
+            height=600,
+            template="plotly_white",
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1
+            ),
+            margin=dict(l=50, r=50, b=50, t=80),
+            xaxis=dict(
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=1, label="1m", step="month", stepmode="backward"),
+                        dict(count=6, label="6m", step="month", stepmode="backward"),
+                        dict(count=1, label="YTD", step="year", stepmode="todate"),
+                        dict(count=1, label="1y", step="year", stepmode="backward"),
+                        dict(step="all")
+                    ])
+                ),
+                rangeslider=dict(visible=True),
+                type="date"
+            ),
+            yaxis=dict(
+                tickprefix="$",
+                tickformat=",.0f"
+            )
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+    
+    with chart_tab2:
+        # Candlestick chart for the first selected crypto
+        if len(selected_cryptos) > 0:
+            primary_crypto = selected_cryptos[0]
+            if primary_crypto in crypto_data and not crypto_data[primary_crypto].empty:
+                data = crypto_data[primary_crypto]
+                fig = go.Figure(data=[go.Candlestick(
+                    x=data.index,
+                    open=data['Open'],
+                    high=data['High'],
+                    low=data['Low'],
+                    close=data['Close'],
+                    name=primary_crypto.split("-")[0]
+                )])
+                
+                fig.update_layout(
+                    title=f"{primary_crypto.split('-')[0]} Candlestick Chart",
+                    xaxis_title="Date",
+                    yaxis_title="Price (USD)",
+                    height=600,
+                    template="plotly_white",
+                    xaxis_rangeslider_visible=False
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.warning(f"No candlestick data available for {primary_crypto}")
+    
+    with chart_tab3:
+        # Performance metrics table
+        if len(crypto_data) > 0:
+            metrics = []
+            for ticker, data in crypto_data.items():
+                if not data.empty and len(data) > 1:
+                    start_price = data['Close'].iloc[0]
+                    end_price = data['Close'].iloc[-1]
+                    pct_change = (end_price / start_price - 1) * 100
+                    volatility = data['Close'].pct_change().std() * np.sqrt(365)  # Annualized volatility
+                    metrics.append({
+                        'Cryptocurrency': ticker.split("-")[0],
+                        'Start Price': f"${start_price:,.2f}",
+                        'End Price': f"${end_price:,.2f}",
+                        'Return (%)': f"{pct_change:.2f}%",
+                        'Volatility (Annualized)': f"{volatility:.2%}",
+                        'High': f"${data['High'].max():,.2f}",
+                        'Low': f"${data['Low'].min():,.2f}"
+                    })
             
-            fig, ax = plt.subplots(figsize=(10, 8))
-            sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", ax=ax)
-            st.pyplot(fig)
+            if metrics:
+                metrics_df = pd.DataFrame(metrics)
+                st.dataframe(
+                    metrics_df,
+                    column_config={
+                        "Return (%)": st.column_config.ProgressColumn(
+                            "Return (%)",
+                            help="Percentage return over selected period",
+                            format="%.2f%%",
+                            min_value=min(metrics_df['Return (%)'].str.replace('%', '').astype(float)),
+                            max_value=max(metrics_df['Return (%)'].str.replace('%', '').astype(float))
+                    },
+                    hide_index=True,
+                    use_container_width=True
+                )
+            else:
+                st.warning("No metrics available for the selected cryptocurrencies")
 
-# Forecast Tab
-def forecast_tab(selected_cryptos, time_period, forecast_days):
-    st.header("Cryptocurrency Price Forecast")
+# Enhanced Analysis Tab with more technical indicators
+def analysis_tab(selected_cryptos, time_period):
+    st.header("📊 Technical Analysis")
+    st.markdown("Advanced technical indicators and correlation analysis")
     
     if not selected_cryptos:
         st.warning("Please select at least one cryptocurrency from the sidebar.")
         return
     
-    # Get data for selected cryptos
-    crypto_data = get_multiple_cryptos(selected_cryptos, time_period)
+    with st.spinner("Loading analysis data..."):
+        crypto_data = get_multiple_cryptos(selected_cryptos, time_period)
+    
+    if not crypto_data:
+        st.error("No data available for the selected cryptocurrencies.")
+        return
+    
+    # Create tabs for different analysis types
+    analysis_tab1, analysis_tab2, analysis_tab3 = st.tabs(["Returns Analysis", "Correlation Matrix", "Technical Indicators"])
+    
+    with analysis_tab1:
+        # Calculate daily returns
+        returns_data = {}
+        for ticker, data in crypto_data.items():
+            if not data.empty:
+                returns_data[ticker] = data['Close'].pct_change().dropna()
+        
+        # Plot returns distribution
+        if len(returns_data) > 0:
+            st.subheader("Daily Returns Distribution")
+            
+            # Use columns for better layout
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                fig, ax = plt.subplots(figsize=(10, 6))
+                for ticker, returns in returns_data.items():
+                    sns.kdeplot(returns, label=ticker.split("-")[0], ax=ax)
+                ax.set_title("Density of Daily Returns")
+                ax.set_xlabel("Daily Return")
+                ax.set_ylabel("Density")
+                ax.legend()
+                st.pyplot(fig)
+            
+            with col2:
+                # Display key statistics
+                stats = []
+                for ticker, returns in returns_data.items():
+                    stats.append({
+                        'Cryptocurrency': ticker.split("-")[0],
+                        'Mean Return': f"{returns.mean():.4%}",
+                        'Std Dev': f"{returns.std():.4%}",
+                        'Skewness': f"{returns.skew():.2f}",
+                        'Kurtosis': f"{returns.kurtosis():.2f}"
+                    })
+                
+                if stats:
+                    st.dataframe(
+                        pd.DataFrame(stats),
+                        hide_index=True,
+                        use_container_width=True
+                    )
+    
+    with analysis_tab2:
+        # Correlation matrix
+        if len(selected_cryptos) > 1:
+            st.subheader("Cryptocurrency Correlations")
+            
+            # Create a DataFrame with closing prices
+            close_prices = pd.DataFrame()
+            for ticker, data in crypto_data.items():
+                if not data.empty:
+                    close_prices[ticker.split("-")[0]] = data['Close']
+            
+            if not close_prices.empty:
+                # Calculate correlations
+                corr_matrix = close_prices.corr()
+                
+                # Plot heatmap
+                fig, ax = plt.subplots(figsize=(10, 8))
+                sns.heatmap(
+                    corr_matrix, 
+                    annot=True, 
+                    cmap="coolwarm", 
+                    vmin=-1, 
+                    vmax=1, 
+                    center=0,
+                    ax=ax,
+                    fmt=".2f",
+                    linewidths=.5
+                )
+                ax.set_title("Cryptocurrency Price Correlations")
+                st.pyplot(fig)
+                
+                # Interpretation
+                st.markdown("""
+                **Correlation Interpretation:**
+                - 1.0: Perfect positive correlation
+                - 0.8-1.0: Very strong positive correlation
+                - 0.6-0.8: Strong positive correlation
+                - 0.4-0.6: Moderate positive correlation
+                - 0.2-0.4: Weak positive correlation
+                - -0.2-0.2: Little to no correlation
+                - Negative values indicate inverse relationships
+                """)
+    
+    with analysis_tab3:
+        # Technical indicators for the first selected crypto
+        if len(selected_cryptos) > 0:
+            primary_crypto = selected_cryptos[0]
+            if primary_crypto in crypto_data and not crypto_data[primary_crypto].empty:
+                data = crypto_data[primary_crypto]
+                
+                # Calculate indicators
+                data['SMA_20'] = data['Close'].rolling(window=20).mean()
+                data['SMA_50'] = data['Close'].rolling(window=50).mean()
+                data['RSI'] = compute_rsi(data['Close'], 14)
+                
+                # Plot indicators
+                fig = go.Figure()
+                
+                # Price and SMAs
+                fig.add_trace(go.Scatter(
+                    x=data.index,
+                    y=data['Close'],
+                    name="Price",
+                    line=dict(color='royalblue', width=2)
+                ))
+                fig.add_trace(go.Scatter(
+                    x=data.index,
+                    y=data['SMA_20'],
+                    name="20-Day SMA",
+                    line=dict(color='orange', width=1)
+                ))
+                fig.add_trace(go.Scatter(
+                    x=data.index,
+                    y=data['SMA_50'],
+                    name="50-Day SMA",
+                    line=dict(color='green', width=1)
+                ))
+                
+                fig.update_layout(
+                    title=f"{primary_crypto.split('-')[0]} with Technical Indicators",
+                    height=400,
+                    template="plotly_white",
+                    showlegend=True
+                )
+                
+                # RSI subplot
+                fig_rsi = go.Figure()
+                fig_rsi.add_trace(go.Scatter(
+                    x=data.index,
+                    y=data['RSI'],
+                    name="RSI (14)",
+                    line=dict(color='purple', width=2)
+                ))
+                fig_rsi.add_hline(y=70, line_dash="dash", line_color="red")
+                fig_rsi.add_hline(y=30, line_dash="dash", line_color="green")
+                fig_rsi.update_layout(
+                    height=200,
+                    template="plotly_white",
+                    showlegend=True,
+                    margin=dict(t=10)
+                )
+                
+                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig_rsi, use_container_width=True)
+                
+                # Interpretation
+                st.markdown("""
+                **Technical Indicators Interpretation:**
+                - **SMA (Simple Moving Average):** 
+                    - 20-day SMA: Short-term trend indicator
+                    - 50-day SMA: Medium-term trend indicator
+                    - When price crosses above SMA, potential bullish signal
+                    - When price crosses below SMA, potential bearish signal
+                - **RSI (Relative Strength Index):**
+                    - Above 70: Overbought condition (potential sell signal)
+                    - Below 30: Oversold condition (potential buy signal)
+                """)
+            else:
+                st.warning(f"No data available for {primary_crypto}")
+
+# Helper function to compute RSI
+def compute_rsi(series, period=14):
+    delta = series.diff()
+    gain = delta.where(delta > 0, 0)
+    loss = -delta.where(delta < 0, 0)
+    
+    avg_gain = gain.rolling(window=period).mean()
+    avg_loss = loss.rolling(window=period).mean()
+    
+    rs = avg_gain / avg_loss
+    rsi = 100 - (100 / (1 + rs))
+    return rsi
+
+# Enhanced Forecast Tab with confidence intervals
+def forecast_tab(selected_cryptos, time_period, forecast_days):
+    st.header("🔮 Price Forecast")
+    st.markdown("Machine learning-based price predictions with confidence intervals")
+    
+    if not selected_cryptos:
+        st.warning("Please select at least one cryptocurrency from the sidebar.")
+        return
+    
+    with st.spinner("Preparing forecasts..."):
+        crypto_data = get_multiple_cryptos(selected_cryptos, time_period)
     
     if not crypto_data:
         st.error("No data available for the selected cryptocurrencies.")
@@ -266,10 +663,10 @@ def forecast_tab(selected_cryptos, time_period, forecast_days):
             st.subheader(f"{ticker.split('-')[0]} Price Forecast")
             
             # Get forecast
-            future_dates, future_prices, mae = forecast_crypto_price(data, forecast_days)
+            future_dates, future_prices, mae, rmse = forecast_crypto_price(data, forecast_days)
             
             if future_dates is not None:
-                # Plot historical and forecasted data
+                # Plot historical and forecasted data with confidence interval
                 fig = go.Figure()
                 
                 # Historical data
@@ -277,106 +674,177 @@ def forecast_tab(selected_cryptos, time_period, forecast_days):
                     x=data.index,
                     y=data['Close'],
                     name="Historical",
-                    mode='lines'
+                    mode='lines',
+                    line=dict(color='#1f77b4', width=2)
                 ))
                 
-                # Forecasted data
+                # Forecasted data with confidence interval
                 fig.add_trace(go.Scatter(
                     x=future_dates,
                     y=future_prices,
                     name="Forecast",
                     mode='lines',
-                    line=dict(color='orange', dash='dash')
+                    line=dict(color='#ff7f0e', width=2, dash='dash')
+                ))
+                
+                # Confidence interval (using RMSE as proxy for uncertainty)
+                fig.add_trace(go.Scatter(
+                    x=list(future_dates) + list(future_dates)[::-1],
+                    y=list(np.array(future_prices) + rmse) + list(np.array(future_prices) - rmse)[::-1],
+                    fill='toself',
+                    fillcolor='rgba(255, 127, 14, 0.2)',
+                    line=dict(color='rgba(255,255,255,0)'),
+                    name="Confidence Interval"
                 ))
                 
                 fig.update_layout(
-                    title=f"{ticker.split('-')[0]} Price Forecast",
+                    title=f"{ticker.split('-')[0]} Price Forecast with {forecast_days}-Day Horizon",
                     xaxis_title="Date",
                     yaxis_title="Price (USD)",
                     hovermode="x unified",
-                    height=500
+                    height=500,
+                    template="plotly_white",
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
                 )
                 
                 st.plotly_chart(fig, use_container_width=True)
                 
-                # Show forecast metrics
-                col1, col2 = st.columns(2)
+                # Show forecast metrics in columns
+                col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("Last Price", f"${data['Close'].iloc[-1]:,.2f}")
+                    st.metric(
+                        "Last Price", 
+                        f"${data['Close'].iloc[-1]:,.2f}",
+                        delta=f"{(data['Close'].iloc[-1] - data['Close'].iloc[-2]):,.2f}",
+                        delta_color="normal"
+                    )
                 with col2:
-                    st.metric("Forecast MAE", f"${mae:,.2f}")
+                    st.metric("Forecast MAE", f"${mae:,.2f}", "Mean Absolute Error")
+                with col3:
+                    st.metric("Forecast RMSE", f"${rmse:,.2f}", "Root Mean Squared Error")
                 
-                # Show forecast table
-                if st.checkbox(f"Show forecast data for {ticker.split('-')[0]}"):
+                # Show forecast table with download option
+                if st.checkbox(f"Show detailed forecast for {ticker.split('-')[0]}"):
                     forecast_df = pd.DataFrame({
                         "Date": future_dates,
-                        "Forecasted Price": future_prices
-                    })
-                    st.dataframe(forecast_df)
+                        "Forecasted Price": future_prices,
+                        "Upper Bound": np.array(future_prices) + rmse,
+                        "Lower Bound": np.array(future_prices) - rmse
+                    }).set_index("Date")
+                    
+                    st.dataframe(
+                        forecast_df.style.format({
+                            "Forecasted Price": "${:,.2f}",
+                            "Upper Bound": "${:,.2f}",
+                            "Lower Bound": "${:,.2f}"
+                        }),
+                        use_container_width=True
+                    )
+                    
+                    # Download button
+                    csv = forecast_df.to_csv().encode('utf-8')
+                    st.download_button(
+                        label="Download Forecast Data",
+                        data=csv,
+                        file_name=f"{ticker.split('-')[0]}_forecast.csv",
+                        mime="text/csv"
+                    )
+                
+                # Forecast interpretation
+                st.markdown("""
+                **Forecast Interpretation:**
+                - The forecast is generated using a Random Forest Regressor with technical indicators as features
+                - The shaded area represents a confidence interval based on model error metrics
+                - Longer forecast horizons generally have higher uncertainty
+                - Consider multiple indicators before making investment decisions
+                """)
 
-# News Tab
+# Enhanced News Tab with proper news display
 def news_tab():
-    st.header("Latest Cryptocurrency News")
+    st.header("📰 Latest Cryptocurrency News")
+    st.markdown("Stay updated with the most recent developments in the crypto space")
     
-    # Get news
-    news_articles = get_crypto_news()
+    with st.spinner("Fetching latest news..."):
+        news_articles = get_crypto_news()
     
     if not news_articles:
         st.warning("Could not fetch news articles. Please try again later.")
         return
     
-    # Display news cards
-    for article in news_articles:
+    # Display news cards with enhanced UI
+    for i, article in enumerate(news_articles):
         with st.container():
-            col1, col2 = st.columns([1, 3])
+            # Create a card-like container
+            st.markdown(
+                f"""
+                <div class="st-cn">
+                    <div style="display: flex; gap: 20px; align-items: center;">
+                        <div style="flex: 1;">
+                            <h3 style="margin-bottom: 5px;"><a href="{article['link']}" target="_blank" style="color: inherit; text-decoration: none;">{article['title']}</a></h3>
+                            <p style="color: #666; font-size: 0.9em; margin-bottom: 10px;">
+                                {article['provider']} • {article['published'].strftime('%b %d, %Y %H:%M') if article['published'] else 'Unknown date'}
+                            </p>
+                            <p style="margin-bottom: 0;">{article['summary'][:250]}...</p>
+                        </div>
+                        {"<div style='flex: 0 0 200px;'><img src='"+article['thumbnail']+"' style='width: 100%; border-radius: 5px;'/></div>" if article['thumbnail'] else ""}
+                    </div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
             
-            with col1:
-                # Handle image if available
-                if 'thumbnail' in article and article['thumbnail']['resolutions']:
-                    st.image(article['thumbnail']['resolutions'][0]['url'], width=200)
-                else:
-                    st.image("https://via.placeholder.com/200x150?text=No+Image", width=200)
-            
-            with col2:
-                title = article.get('title', 'No title available')
-                link = article.get('link', '#')
-                st.markdown(f"### [{title}]({link})")
-                
-                if 'providerPublishTime' in article:
-                    publish_time = datetime.fromtimestamp(article['providerPublishTime'])
-                    st.caption(f"Published: {publish_time.strftime('%Y-%m-%d %H:%M')}")
-                
-                if 'summary' in article:
-                    st.write(article['summary'][:200] + "...")
-                elif 'description' in article:
-                    st.write(article['description'][:200] + "...")
-                
-                # Add a separator
-                st.markdown("---")
+            # Add spacing between cards except after last item
+            if i < len(news_articles) - 1:
+                st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
 
-# Main App
+# Main App with enhanced error handling
 def main():
-    # Sidebar
-    selected_cryptos, time_period, forecast_days = sidebar()
-    
-    # Main content
-    tab1, tab2, tab3, tab4 = st.tabs(["Price", "Crypto Analysis", "Forecast", "News"])
-    
-    with tab1:
-        price_tab(selected_cryptos, time_period)
-    
-    with tab2:
-        analysis_tab(selected_cryptos, time_period)
-    
-    with tab3:
-        forecast_tab(selected_cryptos, time_period, forecast_days)
-    
-    with tab4:
-        news_tab()
-
-if __name__ == "__main__":
     try:
-        main()
+        # Sidebar
+        selected_cryptos, time_period, forecast_days = sidebar()
+        
+        # Main content with loading animation
+        with st.spinner("Loading dashboard..."):
+            tab1, tab2, tab3, tab4 = st.tabs([
+                "📈 Price Analysis", 
+                "📊 Technical Tools", 
+                "🔮 Forecast", 
+                "📰 News & Insights"
+            ])
+            
+            with tab1:
+                price_tab(selected_cryptos, time_period)
+            
+            with tab2:
+                analysis_tab(selected_cryptos, time_period)
+            
+            with tab3:
+                forecast_tab(selected_cryptos, time_period, forecast_days)
+            
+            with tab4:
+                news_tab()
+        
+        # Footer
+        st.markdown("---")
+        st.markdown(
+            """
+            <div style="text-align: center; color: #666; font-size: 0.9em;">
+                <p>CryptoVision Pro • Data provided by Yahoo Finance • Updated at {}</p>
+                <p>Disclaimer: This is for informational purposes only and not financial advice.</p>
+            </div>
+            """.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+            unsafe_allow_html=True
+        )
+    
     except Exception as e:
         st.error(f"An unexpected error occurred: {str(e)}")
-        st.error("Please refresh the page and try again.")
+        st.error("Please refresh the page and try again. If the problem persists, contact support.")
+
+if __name__ == "__main__":
+    main()
