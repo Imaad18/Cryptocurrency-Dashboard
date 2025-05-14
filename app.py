@@ -130,7 +130,7 @@ def get_crypto_news():
                 'link': item.get('link', '#'),
                 'summary': item.get('summary', '') or item.get('description', 'No summary available'),
                 'provider': item.get('publisher', 'Unknown source'),
-                'published': datetime.fromtimestamp(item.get('providerPublishTime', time.time()) if 'providerPublishTime' in item else None,
+                'published': datetime.fromtimestamp(item.get('providerPublishTime'), time.time()) if 'providerPublishTime' in item else None,
                 'thumbnail': item.get('thumbnail', {}).get('resolutions', [{}])[0].get('url', None) if 'thumbnail' in item else None
             }
             news_items.append(news_item)
