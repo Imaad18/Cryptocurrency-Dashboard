@@ -451,7 +451,8 @@ def create_sample_portfolio():
         "current_price": btc_price,
         "current_value": 0.5 * btc_price,
         "profit_loss": 0.5 * (btc_price - (btc_price * 0.9)),
-        "profit_loss_percentage": ((btc_price - (btc_price * 0.9)) / (btc_price * 0.9) * 100)})
+        "profit_loss_percentage": ((btc_price - (btc_price * 0.9)) / (btc_price * 0.9) * 100)
+    })
     
     # Add Ethereum
     portfolio.append({
@@ -463,7 +464,8 @@ def create_sample_portfolio():
         "current_price": eth_price,
         "current_value": 3.0 * eth_price,
         "profit_loss": 3.0 * (eth_price - (eth_price * 0.93)),
-        "profit_loss_percentage": ((eth_price - (eth_price * 0.93)) / (eth_price * 0.93) * 100)})
+        "profit_loss_percentage": ((eth_price - (eth_price * 0.93)) / (eth_price * 0.93) * 100)
+    })
     
     # Add Cardano
     portfolio.append({
@@ -475,7 +477,8 @@ def create_sample_portfolio():
         "current_price": ada_price,
         "current_value": 1000.0 * ada_price,
         "profit_loss": 1000.0 * (ada_price - (ada_price * 1.1)),
-        "profit_loss_percentage": ((ada_price - (ada_price * 1.1)) / (ada_price * 1.1) * 100})
+        "profit_loss_percentage": ((ada_price - (ada_price * 1.1)) / (ada_price * 1.1) * 100)
+    })
     
     return portfolio
 
