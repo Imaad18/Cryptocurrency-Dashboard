@@ -434,6 +434,7 @@ def price_tab(selected_cryptos, time_period):
                             format="%.2f%%",
                             min_value=min(metrics_df['Return (%)'].str.replace('%', '').astype(float)),
                             max_value=max(metrics_df['Return (%)'].str.replace('%', '').astype(float))
+                        )
                     },
                     hide_index=True,
                     use_container_width=True
