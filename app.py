@@ -113,44 +113,38 @@ def get_multiple_cryptos(tickers, period="1y"):
     progress_bar.empty()
     return data
 
-@st.cache_data(ttl=1800, show_spinner="Fetching latest cryptocurrency news...")
+@st.cache_data(ttl=1800)
 def get_crypto_news():
-    try:
-        # Using multiple sources for news
-        news_items = []
-        
-        # Get Bitcoin news as proxy for general crypto news
-        btc = yf.Ticker("BTC-USD")
-        yf_news = btc.news
-        
-        for item in yf_news[:15]:  # Get more items to filter
-            # Standardize news items
-            news_item = {
-                'title': item.get('title', 'No title available'),
-                'link': item.get('link', '#'),
-                'summary': item.get('summary', '') or item.get('description', 'No summary available'),
-                'provider': item.get('publisher', 'Unknown source'),
-                'published': datetime.fromtimestamp(item.get('providerPublishTime'), time.time()) if 'providerPublishTime' in item else None,
-                'thumbnail': item.get('thumbnail', {}).get('resolutions', [{}])[0].get('url', None) if 'thumbnail' in item else None
-            }
-            news_items.append(news_item)
-        
-        # Filter out duplicates and sort by date
-        unique_news = {}
-        for item in news_items:
-            if item['title'] not in unique_news:
-                unique_news[item['title']] = item
-        
-        # Sort by published date (newest first)
-        sorted_news = sorted(unique_news.values(), 
-                           key=lambda x: x['published'] if x['published'] else datetime.min, 
-                           reverse=True)
-        
-        return sorted_news[:10]  # Return top 10 unique news items
-        
-    except Exception as e:
-        st.error(f"Error fetching news: {str(e)}")
-        return []
+    news_items = []
+    sources = [
+        {'name': 'CoinDesk', 'url': 'https://www.coindesk.com/arc/outboundfeeds/rss/'},
+        {'name': 'Cointelegraph', 'url': 'https://cointelegraph.com/rss'},
+        {'name': 'Crypto News', 'url': 'https://cryptonews.com/news/feed/'}
+    ]
+    
+    for source in sources:
+        try:
+            feed = feedparser.parse(source['url'])
+            for entry in feed.entries[:5]:
+                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.now()
+                thumbnail = None
+                if hasattr(entry, 'media_content') and entry.media_content:
+                    thumbnail = entry.media_content[0]['url']
+                
+                news_items.append({
+                    'title': entry.title,
+                    'link': entry.link,
+                    'summary': entry.description if hasattr(entry, 'description') else '',
+                    'provider': source['name'],
+                    'published': published,
+                    'thumbnail': thumbnail
+                })
+        except:
+            continue
+    
+    news_items.sort(key=lambda x: x['published'], reverse=True)
+    return news_items[:15]
+
 
 # Enhanced forecasting function with multiple models
 def forecast_crypto_price(data, days=30):
@@ -774,41 +768,26 @@ def forecast_tab(selected_cryptos, time_period, forecast_days):
 
 # Enhanced News Tab with proper news display
 def news_tab():
-    st.header("📰 Latest Cryptocurrency News")
-    st.markdown("Stay updated with the most recent developments in the crypto space")
+    st.header("📰 Crypto News")
+    news_articles = get_crypto_news()
     
-    with st.spinner("Fetching latest news..."):
-        news_articles = get_crypto_news()
-    
-    if not news_articles:
-        st.warning("Could not fetch news articles. Please try again later.")
-        return
-    
-    # Display news cards with enhanced UI
-    for i, article in enumerate(news_articles):
+    for article in news_articles:
         with st.container():
-            # Create a card-like container
             st.markdown(
                 f"""
                 <div class="st-cn">
-                    <div style="display: flex; gap: 20px; align-items: center;">
-                        <div style="flex: 1;">
-                            <h3 style="margin-bottom: 5px;"><a href="{article['link']}" target="_blank" style="color: inherit; text-decoration: none;">{article['title']}</a></h3>
-                            <p style="color: #666; font-size: 0.9em; margin-bottom: 10px;">
-                                {article['provider']} • {article['published'].strftime('%b %d, %Y %H:%M') if article['published'] else 'Unknown date'}
-                            </p>
-                            <p style="margin-bottom: 0;">{article['summary'][:250]}...</p>
-                        </div>
-                        {"<div style='flex: 0 0 200px;'><img src='"+article['thumbnail']+"' style='width: 100%; border-radius: 5px;'/></div>" if article['thumbnail'] else ""}
-                    </div>
+                    <h3><a href="{article['link']}" target="_blank" style="color:inherit;text-decoration:none;">
+                        {article['title']}
+                    </a></h3>
+                    <p style="color:#666;font-size:0.9em;">
+                        {article['provider']} • {article['published'].strftime('%b %d, %Y')}
+                    </p>
+                    <p>{article['summary'][:200]}...</p>
                 </div>
                 """,
                 unsafe_allow_html=True
             )
-            
-            # Add spacing between cards except after last item
-            if i < len(news_articles) - 1:
-                st.markdown("<div style='height: 20px;'></div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
 # Main App with enhanced error handling
 def main():
