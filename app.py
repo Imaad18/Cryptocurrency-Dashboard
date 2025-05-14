@@ -140,6 +140,16 @@ st.markdown("""
 st.markdown("<h1 class='main-header'>📊 Cryptocurrency Analysis Dashboard</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; font-size: 1.2rem;'>A simple dashboard to analyze cryptocurrency data</p>", unsafe_allow_html=True)
 
+# CoinCap API configuration
+COINCAP_API_KEY = "6d2948ae249cd9522566faa6a9a9c7eb21421348bf3b294b3a8e536824411a8d"
+COINCAP_BASE_URL = "https://api.coincap.io/v2"
+
+# Headers for CoinCap API
+headers = {
+    "Authorization": f"Bearer {COINCAP_API_KEY}",
+    "Accept": "application/json"
+}
+
 # Sidebar for navigation
 with st.sidebar:
     st.markdown("<h2 style='text-align: center;'>Navigation</h2>", unsafe_allow_html=True)
@@ -253,43 +263,37 @@ with st.sidebar:
     with st.expander("Disclaimer"):
         st.markdown("""
         This dashboard is for educational purposes only. Cryptocurrency investments are subject to market risks. 
-        Data is provided by CoinGecko API and may not be real-time.
+        Data is provided by CoinCap API and may not be real-time.
         """)
 
 # Dictionary of popular cryptocurrencies with their IDs
 popular_cryptos = {
     "Bitcoin": "bitcoin",
     "Ethereum": "ethereum",
-    "Binance Coin": "binancecoin",
-    "Cardano": "cardano",
+    "Tether": "tether",
+    "BNB": "binance-coin",
     "Solana": "solana",
-    "XRP": "ripple",
-    "Polkadot": "polkadot",
+    "XRP": "xrp",
+    "USDC": "usd-coin",
+    "Cardano": "cardano",
     "Dogecoin": "dogecoin",
-    "Avalanche": "avalanche-2",
-    "Polygon": "matic-network",
+    "Avalanche": "avalanche",
+    "Polygon": "polygon",
+    "Polkadot": "polkadot",
     "Litecoin": "litecoin",
     "Chainlink": "chainlink",
-    "Stellar": "stellar",
-    "Uniswap": "uniswap",
-    "Tron": "tron"
+    "Stellar": "stellar"
 }
 
-# Function to get top cryptocurrencies
+# Function to get top cryptocurrencies from CoinCap
 @st.cache_data(ttl=300, show_spinner="Fetching market data...")
 def get_top_cryptos(limit=50):
     try:
-        url = "https://api.coingecko.com/api/v3/coins/markets"
+        url = f"{COINCAP_BASE_URL}/assets"
         params = {
-            "vs_currency": "usd",
-            "order": "market_cap_desc",
-            "per_page": limit,
-            "page": 1,
-            "sparkline": False
-        }
-        headers = {
-            "Accept": "application/json",
-            "User-Agent": "CryptoTrack Dashboard"
+            "limit": limit,
+            "sort": "marketCapUsd",
+            "order": "desc"
         }
         response = requests.get(url, params=params, headers=headers)
         
@@ -301,41 +305,76 @@ def get_top_cryptos(limit=50):
             st.warning(f"API error: {response.status_code}. Using cached data if available.")
             return pd.DataFrame()
         
-        return pd.DataFrame(response.json())
+        data = response.json()['data']
+        
+        # Convert to DataFrame and format
+        df = pd.DataFrame(data)
+        
+        # Convert numeric columns
+        numeric_cols = ['priceUsd', 'marketCapUsd', 'volumeUsd24Hr', 'changePercent24Hr']
+        for col in numeric_cols:
+            df[col] = pd.to_numeric(df[col])
+        
+        # Rename columns for consistency
+        df = df.rename(columns={
+            'id': 'id',
+            'symbol': 'symbol',
+            'name': 'name',
+            'priceUsd': 'current_price',
+            'marketCapUsd': 'market_cap',
+            'volumeUsd24Hr': 'total_volume',
+            'changePercent24Hr': 'price_change_percentage_24h'
+        })
+        
+        return df
     except Exception as e:
         st.error(f"Error fetching top cryptocurrencies: {e}")
         return pd.DataFrame()
 
-# Function to get crypto data using CoinGecko API
+# Function to get crypto historical data from CoinCap
 @st.cache_data(ttl=300, show_spinner="Fetching cryptocurrency data...")
 def get_crypto_data(coin_id, days=30):
     try:
-        url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
+        # Get current price data first
+        asset_url = f"{COINCAP_BASE_URL}/assets/{coin_id}"
+        asset_response = requests.get(asset_url, headers=headers)
+        
+        if asset_response.status_code != 200:
+            return pd.DataFrame()
+        
+        current_data = asset_response.json()['data']
+        current_price = float(current_data['priceUsd'])
+        
+        # Get historical data
+        end_time = int(datetime.now().timestamp() * 1000)
+        start_time = int((datetime.now() - timedelta(days=days)).timestamp() * 1000
+        
+        history_url = f"{COINCAP_BASE_URL}/assets/{coin_id}/history"
         params = {
-            "vs_currency": "usd",
-            "days": days,
-            "interval": "daily"
+            "interval": "d1",
+            "start": start_time,
+            "end": end_time
         }
-        headers = {
-            "Accept": "application/json",
-            "User-Agent": "CryptoTrack Dashboard"
-        }
-        response = requests.get(url, params=params, headers=headers)
+        history_response = requests.get(history_url, params=params, headers=headers)
         
-        if response.status_code == 429:
-            st.warning("API rate limit reached. Using cached data if available or trying again shortly...")
+        if history_response.status_code != 200:
             return pd.DataFrame()
         
-        if response.status_code != 200:
-            st.warning(f"API error: {response.status_code}. Using cached data if available.")
-            return pd.DataFrame()
+        history_data = history_response.json()['data']
         
-        data = response.json()
+        # Convert to DataFrame
+        df = pd.DataFrame(history_data)
+        df['price'] = pd.to_numeric(df['priceUsd'])
+        df['date'] = pd.to_datetime(df['date'])
+        df = df[['date', 'price']].sort_values('date')
         
-        # Convert price data to DataFrame
-        df = pd.DataFrame(data["prices"], columns=["timestamp", "price"])
-        df["date"] = pd.to_datetime(df["timestamp"], unit="ms")
-        df = df[["date", "price"]]
+        # Add current price as last entry if not already present
+        last_date = df['date'].max()
+        if (datetime.now() - last_date).days > 0:
+            df = pd.concat([df, pd.DataFrame([{
+                'date': datetime.now(),
+                'price': current_price
+            }])], ignore_index=True)
         
         return df
     except Exception as e:
@@ -397,17 +436,22 @@ def calculate_indicators(df):
 def create_sample_portfolio():
     portfolio = []
     
+    # Get current prices for sample portfolio
+    btc_price = float(requests.get(f"{COINCAP_BASE_URL}/assets/bitcoin", headers=headers).json()['data']['priceUsd'])
+    eth_price = float(requests.get(f"{COINCAP_BASE_URL}/assets/ethereum", headers=headers).json()['data']['priceUsd'])
+    ada_price = float(requests.get(f"{COINCAP_BASE_URL}/assets/cardano", headers=headers).json()['data']['priceUsd'])
+    
     # Add Bitcoin
     portfolio.append({
         "crypto_name": "Bitcoin",
         "crypto_id": "bitcoin",
         "quantity": 0.5,
-        "purchase_price": 40000,
+        "purchase_price": btc_price * 0.9,  # 10% below current
         "purchase_date": datetime.now() - timedelta(days=30),
-        "current_price": 45000,
-        "current_value": 22500,
-        "profit_loss": 2500,
-        "profit_loss_percentage": 12.5
+        "current_price": btc_price,
+        "current_value": 0.5 * btc_price,
+        "profit_loss": 0.5 * (btc_price - (btc_price * 0.9)),
+        "profit_loss_percentage": ((btc_price - (btc_price * 0.9)) / (btc_price * 0.9) * 100
     })
     
     # Add Ethereum
@@ -415,12 +459,12 @@ def create_sample_portfolio():
         "crypto_name": "Ethereum",
         "crypto_id": "ethereum",
         "quantity": 3.0,
-        "purchase_price": 2800,
+        "purchase_price": eth_price * 0.93,  # 7% below current
         "purchase_date": datetime.now() - timedelta(days=14),
-        "current_price": 3000,
-        "current_value": 9000,
-        "profit_loss": 600,
-        "profit_loss_percentage": 7.14
+        "current_price": eth_price,
+        "current_value": 3.0 * eth_price,
+        "profit_loss": 3.0 * (eth_price - (eth_price * 0.93)),
+        "profit_loss_percentage": ((eth_price - (eth_price * 0.93)) / (eth_price * 0.93) * 100
     })
     
     # Add Cardano
@@ -428,60 +472,43 @@ def create_sample_portfolio():
         "crypto_name": "Cardano",
         "crypto_id": "cardano",
         "quantity": 1000.0,
-        "purchase_price": 1.2,
+        "purchase_price": ada_price * 1.1,  # 10% above current
         "purchase_date": datetime.now() - timedelta(days=7),
-        "current_price": 1.1,
-        "current_value": 1100,
-        "profit_loss": -100,
-        "profit_loss_percentage": -8.33
+        "current_price": ada_price,
+        "current_value": 1000.0 * ada_price,
+        "profit_loss": 1000.0 * (ada_price - (ada_price * 1.1)),
+        "profit_loss_percentage": ((ada_price - (ada_price * 1.1)) / (ada_price * 1.1) * 100
     })
     
     return portfolio
 
-# Function to get crypto news (without API)
+# Function to get crypto news (using CoinCap's news endpoint)
+@st.cache_data(ttl=3600, show_spinner="Fetching crypto news...")
 def get_crypto_news():
-    # This is a static list of news - in a real app you would fetch from an API
-    news = [
-        {
-            "title": "Bitcoin Halving Event Completed Successfully",
-            "source": "CoinDesk",
-            "date": "2023-05-15",
-            "summary": "The fourth Bitcoin halving has reduced the block reward from 6.25 BTC to 3.125 BTC, potentially impacting miner profitability and supply dynamics."
-        },
-        {
-            "title": "Ethereum Foundation Announces Major Protocol Upgrade",
-            "source": "The Block",
-            "date": "2023-05-10",
-            "summary": "The upcoming Ethereum upgrade, codenamed 'Dencun', will introduce proto-danksharding to improve scalability and reduce transaction costs."
-        },
-        {
-            "title": "SEC Approves First Spot Bitcoin ETFs",
-            "source": "Bloomberg Crypto",
-            "date": "2023-05-05",
-            "summary": "After years of rejections, the SEC has approved multiple spot Bitcoin ETFs, providing traditional investors with easier access to cryptocurrency."
-        },
-        {
-            "title": "Solana Network Experiences Temporary Outage",
-            "source": "Decrypt",
-            "date": "2023-05-01",
-            "summary": "The Solana blockchain was down for approximately 4 hours due to a bug in the validator software, raising concerns about network stability."
-        },
-        {
-            "title": "Binance CEO Steps Down in $4.3 Billion Settlement with US Authorities",
-            "source": "Reuters",
-            "date": "2023-04-28",
-            "summary": "Changpeng Zhao has pleaded guilty to violating US anti-money laundering laws and stepped down as CEO of Binance in a landmark settlement."
-        },
-        {
-            "title": "BlackRock Files for Spot Ethereum ETF",
-            "source": "CNBC",
-            "date": "2023-04-25",
-            "summary": "The world's largest asset manager has filed paperwork with the SEC to launch a spot Ethereum ETF, following its successful Bitcoin ETF launch."
-        }
-    ]
-    return news
+    try:
+        url = f"{COINCAP_BASE_URL}/news"
+        response = requests.get(url, headers=headers)
+        
+        if response.status_code != 200:
+            return []
+        
+        news_items = response.json()['data']
+        formatted_news = []
+        
+        for item in news_items[:6]:  # Limit to 6 news items
+            formatted_news.append({
+                "title": item.get('title', 'No title'),
+                "source": item.get('source', 'Unknown'),
+                "date": datetime.fromtimestamp(item.get('publishedAt', 0)/1000).strftime('%Y-%m-%d'),
+                "summary": item.get('body', 'No summary available')
+            })
+        
+        return formatted_news
+    except Exception as e:
+        st.error(f"Error fetching news: {e}")
+        return []
 
-# Function to get crypto calendar events
+# Function to get crypto calendar events (mock data as CoinCap doesn't have calendar)
 def get_crypto_calendar():
     # This is a static list of events - in a real app you would fetch from an API
     events = [
@@ -677,7 +704,7 @@ elif page == "Price Analysis":
         "30 days": 30,
         "90 days": 90,
         "1 year": 365,
-        "Max": "max"
+        "Max": 1825  # 5 years
     }
     
     # Get data
@@ -934,17 +961,20 @@ elif page == "News":
     # Get news data
     news_items = get_crypto_news()
     
-    # Display news cards
-    for news in news_items:
-        st.markdown(f"""
-        <div class="news-card">
-            <div class="news-title">{news['title']}</div>
-            <div>{news['summary']}</div>
-            <div class="news-source">{news['source']} • {news['date']}</div>
-        </div>
-        """, unsafe_allow_html=True)
+    if news_items:
+        # Display news cards
+        for news in news_items:
+            st.markdown(f"""
+            <div class="news-card">
+                <div class="news-title">{news['title']}</div>
+                <div>{news['summary']}</div>
+                <div class="news-source">{news['source']} • {news['date']}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.warning("Could not fetch news data. Please try again later.")
     
-    # Add a refresh button (though it won't actually fetch new data in this implementation)
+    # Add a refresh button
     if st.button("Refresh News"):
         st.rerun()
 
@@ -1025,31 +1055,33 @@ elif page == "Portfolio":
         if st.button("Add to Portfolio"):
             # Get current price
             crypto_id = popular_cryptos[crypto_name]
-            df = get_crypto_data(crypto_id, days=1)
-            
-            if not df.empty:
-                current_price = df['price'].iloc[-1]
-                current_value = quantity * current_price
-                cost_basis = quantity * purchase_price
-                profit_loss = current_value - cost_basis
-                profit_loss_pct = (profit_loss / cost_basis) * 100
-                
-                new_holding = {
-                    "crypto_name": crypto_name,
-                    "crypto_id": crypto_id,
-                    "quantity": quantity,
-                    "purchase_price": purchase_price,
-                    "purchase_date": purchase_date,
-                    "current_price": current_price,
-                    "current_value": current_value,
-                    "profit_loss": profit_loss,
-                    "profit_loss_percentage": profit_loss_pct
-                }
-                
-                st.session_state.portfolio.append(new_holding)
-                st.success("Holding added to portfolio!")
-            else:
-                st.error("Could not fetch current price. Please try again later.")
+            try:
+                response = requests.get(f"{COINCAP_BASE_URL}/assets/{crypto_id}", headers=headers)
+                if response.status_code == 200:
+                    current_price = float(response.json()['data']['priceUsd'])
+                    current_value = quantity * current_price
+                    cost_basis = quantity * purchase_price
+                    profit_loss = current_value - cost_basis
+                    profit_loss_pct = (profit_loss / cost_basis) * 100
+                    
+                    new_holding = {
+                        "crypto_name": crypto_name,
+                        "crypto_id": crypto_id,
+                        "quantity": quantity,
+                        "purchase_price": purchase_price,
+                        "purchase_date": purchase_date,
+                        "current_price": current_price,
+                        "current_value": current_value,
+                        "profit_loss": profit_loss,
+                        "profit_loss_percentage": profit_loss_pct
+                    }
+                    
+                    st.session_state.portfolio.append(new_holding)
+                    st.success("Holding added to portfolio!")
+                else:
+                    st.error("Could not fetch current price. Please try again later.")
+            except Exception as e:
+                st.error(f"Error: {e}")
     
     # Display portfolio
     if st.session_state.portfolio:
@@ -1124,7 +1156,7 @@ elif page == "Portfolio":
 # Footer
 st.markdown("""
 <div class="footer">
-    <p>Cryptocurrency Dashboard • Powered by CoinGecko API</p>
+    <p>Cryptocurrency Dashboard • Powered by CoinCap API</p>
     <p>Data updates every 5 minutes</p>
 </div>
 """, unsafe_allow_html=True)
