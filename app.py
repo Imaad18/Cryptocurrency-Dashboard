@@ -142,7 +142,7 @@ st.markdown("<p style='text-align: center; font-size: 1.2rem;'>A simple dashboar
 
 # CoinCap API configuration
 COINCAP_API_KEY = "6d2948ae249cd9522566faa6a9a9c7eb21421348bf3b294b3a8e536824411a8d"
-COINCAP_BASE_URL = "https://api.coincap.io/v2"
+COINCAP_BASE_URL = "https://pro.coincap.io/dashboard"
 
 # Headers for CoinCap API
 headers = {
