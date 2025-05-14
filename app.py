@@ -1,3 +1,4 @@
+# crypto_dashboard.py
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -6,21 +7,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime, timedelta
 import requests
-from newsapi import NewsApiClient
-import os
-from dotenv import load_dotenv
 import time
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error
 import matplotlib.pyplot as plt
 import seaborn as sns
-from PIL import Image
-import io
-import base64
-
-# Load environment variables
-load_dotenv()
 
 # Set page config
 st.set_page_config(
@@ -37,11 +29,9 @@ def local_css(file_name):
 
 local_css("style.css")
 
-# Initialize NewsAPI
-try:
-    newsapi = NewsApiClient(api_key=os.getenv('NEWSAPI_KEY'))
-except Exception as e:
-    st.error(f"Error initializing NewsAPI: {str(e)}")
+# NewsAPI configuration
+NEWS_API_KEY = "sgZNwnmDQmrmY_eOd74ofAyfyDJ7raEedHhcPT3AqhHqT7OO"
+NEWS_API_URL = "https://api.currentsapi.services/v1/search"
 
 # Cache data functions
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -67,15 +57,19 @@ def get_multiple_cryptos(tickers, period="1y"):
     return data
 
 @st.cache_data(ttl=3600, show_spinner=False)
-def get_crypto_news(query="cryptocurrency", language="en", page_size=10):
+def get_crypto_news(query="cryptocurrency"):
     try:
-        news = newsapi.get_everything(
-            q=query,
-            language=language,
-            page_size=page_size,
-            sort_by="publishedAt"
+        response = requests.get(
+            NEWS_API_URL,
+            params={
+                "keywords": query,
+                "language": "en",
+                "apiKey": NEWS_API_KEY
+            }
         )
-        return news.get('articles', [])
+        response.raise_for_status()
+        news = response.json()
+        return news.get('news', [])[:10]  # Get top 10 news articles
     except Exception as e:
         st.error(f"Error fetching news: {str(e)}")
         return []
@@ -492,6 +486,22 @@ def news_tab():
         st.warning("Could not fetch news articles. Please try again later.")
         return
     
+    # Display news cards
+    for article in news_articles:
+        with st.container():
+            col1, col2 = st.columns([1, 3])
+            
+            with col1:
+                image_url = article.get('image', '')
+                if image_url:
+                    st.image(image_url, width=200)
+                else:
+                    st.image("https://via.placeholder.com/200x150?text=No+Image", width=200)
+            
+            with col2:
+                title = article.get('title', 'No title')
+                url = article.get('url', '#')
+                st.markdown(f"### [{title}]({url})")
     # Display news cards
     for article in news_articles:
         with st.container():
