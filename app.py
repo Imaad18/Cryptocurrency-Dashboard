@@ -78,6 +78,34 @@ def local_css(file_name):
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
                 padding: 15px;
             }
+            /* Resource cards */
+            .resource-card {
+                background-color: white;
+                border-radius: 10px;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                padding: 15px;
+                margin-bottom: 20px;
+                transition: transform 0.2s;
+            }
+            .resource-card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+            }
+            .resource-card h3 {
+                margin-top: 0;
+                color: #2c3e50;
+            }
+            .resource-card a {
+                color: #3498db;
+                text-decoration: none;
+            }
+            .resource-card a:hover {
+                text-decoration: underline;
+            }
+            .resource-card p {
+                color: #666;
+                margin-bottom: 10px;
+            }
         </style>
         """, unsafe_allow_html=True)
 
@@ -112,39 +140,6 @@ def get_multiple_cryptos(tickers, period="1y"):
             st.warning(f"Could not fetch data for {ticker}: {str(e)}")
     progress_bar.empty()
     return data
-
-@st.cache_data(ttl=1800)
-def get_crypto_news():
-    news_items = []
-    sources = [
-        {'name': 'CoinDesk', 'url': 'https://www.coindesk.com/arc/outboundfeeds/rss/'},
-        {'name': 'Cointelegraph', 'url': 'https://cointelegraph.com/rss'},
-        {'name': 'Crypto News', 'url': 'https://cryptonews.com/news/feed/'}
-    ]
-    
-    for source in sources:
-        try:
-            feed = feedparser.parse(source['url'])
-            for entry in feed.entries[:5]:
-                published = datetime(*entry.published_parsed[:6]) if hasattr(entry, 'published_parsed') else datetime.now()
-                thumbnail = None
-                if hasattr(entry, 'media_content') and entry.media_content:
-                    thumbnail = entry.media_content[0]['url']
-                
-                news_items.append({
-                    'title': entry.title,
-                    'link': entry.link,
-                    'summary': entry.description if hasattr(entry, 'description') else '',
-                    'provider': source['name'],
-                    'published': published,
-                    'thumbnail': thumbnail
-                })
-        except:
-            continue
-    
-    news_items.sort(key=lambda x: x['published'], reverse=True)
-    return news_items[:15]
-
 
 # Enhanced forecasting function with multiple models
 def forecast_crypto_price(data, days=30):
@@ -766,28 +761,168 @@ def forecast_tab(selected_cryptos, time_period, forecast_days):
                 - Consider multiple indicators before making investment decisions
                 """)
 
-# Enhanced News Tab with proper news display
+# Enhanced News Tab with crypto resources
 def news_tab():
-    st.header("📰 Crypto News")
-    news_articles = get_crypto_news()
+    st.header("📰 Crypto Resources & News")
+    st.markdown("""
+    Explore the latest cryptocurrency news, analysis, and educational resources from trusted sources.
+    """)
     
-    for article in news_articles:
-        with st.container():
-            st.markdown(
-                f"""
-                <div class="st-cn">
-                    <h3><a href="{article['link']}" target="_blank" style="color:inherit;text-decoration:none;">
-                        {article['title']}
-                    </a></h3>
-                    <p style="color:#666;font-size:0.9em;">
-                        {article['provider']} • {article['published'].strftime('%b %d, %Y')}
-                    </p>
-                    <p>{article['summary'][:200]}...</p>
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+    # Create tabs for different resource categories
+    tab1, tab2, tab3 = st.tabs(["News Websites", "Educational Resources", "Market Data"])
+    
+    with tab1:
+        st.subheader("Top Cryptocurrency News Websites")
+        
+        # News resources
+        news_resources = [
+            {
+                "name": "CoinDesk",
+                "url": "https://www.coindesk.com/",
+                "description": "Leading cryptocurrency news outlet covering blockchain, DeFi, and more.",
+                "image": "https://www.coindesk.com/resizer/8Vj6e7p5X6Z6Q5X6Q5X6Q5X6Q5=/1200x628/cloudfront-us-east-1.images.arcpublishing.com/coindesk/ZJ5K5X5Z5FJ5X5Z5FJ5X5Z5FJ5X5.png"
+            },
+            {
+                "name": "Cointelegraph",
+                "url": "https://cointelegraph.com/",
+                "description": "Independent news platform covering blockchain technology, crypto assets, and more.",
+                "image": "https://cointelegraph.com/assets/images/logo.svg"
+            },
+            {
+                "name": "Crypto News",
+                "url": "https://cryptonews.com/",
+                "description": "Comprehensive cryptocurrency news aggregator with price analysis.",
+                "image": "https://cryptonews.com/wp-content/uploads/2021/04/cryptonews-logo.svg"
+            },
+            {
+                "name": "The Block",
+                "url": "https://www.theblock.co/",
+                "description": "Research-driven news about cryptocurrency and blockchain.",
+                "image": "https://www.theblock.co/wp-content/uploads/2021/06/the-block-logo.svg"
+            },
+            {
+                "name": "Decrypt",
+                "url": "https://decrypt.co/",
+                "description": "Human-readable cryptocurrency and blockchain news.",
+                "image": "https://decrypt.co/wp-content/uploads/2019/10/decrypt-logo-white.png"
+            }
+        ]
+        
+        # Display news resources as cards
+        for resource in news_resources:
+            with st.container():
+                st.markdown(
+                    f"""
+                    <div class="resource-card">
+                        <h3><a href="{resource['url']}" target="_blank">{resource['name']}</a></h3>
+                        <p>{resource['description']}</p>
+                        <a href="{resource['url']}" target="_blank">Visit Website →</a>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+    
+    with tab2:
+        st.subheader("Educational Resources")
+        
+        # Educational resources
+        edu_resources = [
+            {
+                "name": "Binance Academy",
+                "url": "https://academy.binance.com/",
+                "description": "Free cryptocurrency and blockchain education for beginners to advanced users.",
+                "image": "https://academy.binance.com/images/logo.svg"
+            },
+            {
+                "name": "CoinGecko Learn",
+                "url": "https://www.coingecko.com/learn",
+                "description": "Educational content about cryptocurrency and blockchain basics.",
+                "image": "https://static.coingecko.com/s/coingecko-logo-8903d34ce19ca4be1c81f0db30e924154750d208683fad7ae6f2ce06c76d0a56.png"
+            },
+            {
+                "name": "Andreessen Horowitz Crypto",
+                "url": "https://a16z.com/crypto/",
+                "description": "Educational resources from one of the top crypto VC firms.",
+                "image": "https://a16z.com/wp-content/uploads/2020/09/a16z-logo.png"
+            },
+            {
+                "name": "Crypto Canon",
+                "url": "https://a16z.com/2018/02/10/crypto-readings-resources/",
+                "description": "Curated list of essential crypto readings from a16z.",
+                "image": "https://a16z.com/wp-content/uploads/2020/09/a16z-logo.png"
+            },
+            {
+                "name": "Ethereum.org Learn",
+                "url": "https://ethereum.org/en/learn/",
+                "description": "Official Ethereum learning portal with beginner to advanced content.",
+                "image": "https://ethereum.org/static/28214aa68a0e6260f3d3a7fe31f5f853/31907/eth-diamond-purple.png"
+            }
+        ]
+        
+        # Display educational resources as cards
+        for resource in edu_resources:
+            with st.container():
+                st.markdown(
+                    f"""
+                    <div class="resource-card">
+                        <h3><a href="{resource['url']}" target="_blank">{resource['name']}</a></h3>
+                        <p>{resource['description']}</p>
+                        <a href="{resource['url']}" target="_blank">Visit Website →</a>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+    
+    with tab3:
+        st.subheader("Market Data & Analytics")
+        
+        # Market data resources
+        market_resources = [
+            {
+                "name": "CoinMarketCap",
+                "url": "https://coinmarketcap.com/",
+                "description": "Cryptocurrency market capitalizations, prices, and charts.",
+                "image": "https://coinmarketcap.com/static/img/logo_200x200.png"
+            },
+            {
+                "name": "CoinGecko",
+                "url": "https://www.coingecko.com/",
+                "description": "Independent cryptocurrency data aggregator with comprehensive metrics.",
+                "image": "https://static.coingecko.com/s/coingecko-logo-8903d34ce19ca4be1c81f0db30e924154750d208683fad7ae6f2ce06c76d0a56.png"
+            },
+            {
+                "name": "Glassnode",
+                "url": "https://glassnode.com/",
+                "description": "On-chain cryptocurrency data and intelligence platform.",
+                "image": "https://glassnode.com/static/img/logo.svg"
+            },
+            {
+                "name": "Messari",
+                "url": "https://messari.io/",
+                "description": "Crypto market intelligence platform with research and data.",
+                "image": "https://messari.io/assets/images/logo.svg"
+            },
+            {
+                "name": "CryptoCompare",
+                "url": "https://www.cryptocompare.com/",
+                "description": "Cryptocurrency market data, indices, and research.",
+                "image": "https://www.cryptocompare.com/media/20562/logo.png"
+            }
+        ]
+        
+        # Display market data resources as cards
+        for resource in market_resources:
+            with st.container():
+                st.markdown(
+                    f"""
+                    <div class="resource-card">
+                        <h3><a href="{resource['url']}" target="_blank">{resource['name']}</a></h3>
+                        <p>{resource['description']}</p>
+                        <a href="{resource['url']}" target="_blank">Visit Website →</a>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
 
 # Main App with enhanced error handling
 def main():
