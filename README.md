@@ -35,4 +35,21 @@ python -m venv venv
 source venv/bin/activate  # On Windows use `venv\Scripts\activate`
 
 3. Install Dependencies
+
 pip install -r requirements.txt
+
+![deepseek_mermaid_20250515_cdb093](https://github.com/user-attachments/assets/acd65d82-5f3e-417d-a63f-b8477c87444a)
+
+
+# Data Sources
+
+* **Market Data:** Yahoo Finance API
+
+* **Technical Indicators:** Computed from price data
+
+* **Forecasting Models:** Random Forest Regressor
+
+* **Resources:** Curated collection of top crypto websites
+
+
+
