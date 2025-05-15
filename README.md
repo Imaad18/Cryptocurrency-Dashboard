@@ -29,3 +29,10 @@ CryptoVision Pro is a comprehensive cryptocurrency analytics dashboard built wit
    ```bash
    git clone https://github.com/yourusername/cryptovision-pro.git
    cd cryptovision-pro
+
+2. Create & Activate Virtual Account
+python -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+
+3. Install Dependencies
+pip install -r requirements.txt
