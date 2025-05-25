@@ -106,6 +106,13 @@ def local_css(file_name):
                 color: #666;
                 margin-bottom: 10px;
             }
+            /* Sidebar image */
+            .sidebar-image {
+                border-radius: 10px;
+                margin-bottom: 20px;
+                width: 100%;
+                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            }
         </style>
         """, unsafe_allow_html=True)
 
@@ -216,7 +223,18 @@ def forecast_crypto_price(data, days=30):
 # Professional sidebar with enhanced features
 def sidebar():
     with st.sidebar:
-        st.image("https://cryptologos.cc/logos/bitcoin-btc-logo.png", width=100)
+        # Modern crypto-themed image
+        st.markdown(
+            """
+            <div style="text-align: center;">
+                <img src="https://images.unsplash.com/photo-1639762681057-408e52192e55?q=80&w=2232&auto=format&fit=crop" 
+                     class="sidebar-image" 
+                     alt="Cryptocurrency concept">
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        
         st.title("CryptoVision Pro")
         st.markdown("---")
         
