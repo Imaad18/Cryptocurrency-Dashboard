@@ -957,6 +957,8 @@ def news_tab():
 # Main App with enhanced error handling
 def main():
     try:
+        inject_futuristic_css()
+        
         # Sidebar
         selected_cryptos, time_period, forecast_days = sidebar()
         
