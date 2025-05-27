@@ -2,8 +2,6 @@
 
 
 
-* Image is just for Reference.
-
 # Live Demo in form of Web App:
 https://cryptocurrency-analytics-dashboard-kngokqniofcfg7ajtkgbyp.streamlit.app/
 
