@@ -31,92 +31,104 @@ st.set_page_config(
 )
 
 # Custom CSS for professional UI
-def local_css(file_name):
-    try:
-        with open(file_name) as f:
-            st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-    except:
-        st.markdown("""
-        <style>
-            /* Main styles */
-            .main {
-                background-color: #f8f9fa;
-            }
-            .stApp {
-                background-color: #f8f9fa;
-            }
-            /* Sidebar */
-            .css-1d391kg {
-                background-color: #2c3e50;
-                color: white;
-            }
-            /* Headers */
-            h1, h2, h3, h4, h5, h6 {
-                color: #2c3e50;
-            }
-            /* Cards */
-            .st-cn {
-                background-color: white;
-                border-radius: 10px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                padding: 15px;
-                margin-bottom: 20px;
-            }
-            /* Buttons */
-            .st-b7 {
-                background-color: #3498db;
-                color: white;
-            }
-            /* Tabs */
-            .st-cq {
-                border-bottom: 2px solid #3498db;
-            }
-            /* Metrics */
-            .st-emotion-cache-1xarl3l {
-                background-color: white;
-                border-radius: 10px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                padding: 15px;
-            }
-            /* Resource cards */
-            .resource-card {
-                background-color: white;
-                border-radius: 10px;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-                padding: 15px;
-                margin-bottom: 20px;
-                transition: transform 0.2s;
-            }
-            .resource-card:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-            }
-            .resource-card h3 {
-                margin-top: 0;
-                color: #2c3e50;
-            }
-            .resource-card a {
-                color: #3498db;
-                text-decoration: none;
-            }
-            .resource-card a:hover {
-                text-decoration: underline;
-            }
-            .resource-card p {
-                color: #666;
-                margin-bottom: 10px;
-            }
-            /* Sidebar image */
-            .sidebar-image {
-                border-radius: 10px;
-                margin-bottom: 20px;
-                width: 100%;
-                box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            }
-        </style>
-        """, unsafe_allow_html=True)
+def inject_futuristic_css():
+    futuristic_css = """
+    <style>
+    /* === GLOBAL === */
+    html, body, .stApp {
+        background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+        font-family: 'Segoe UI', sans-serif;
+        color: #ecf0f1;
+    }
 
-local_css("style.css")
+    /* === HEADINGS === */
+    h1, h2, h3, h4, h5, h6 {
+        color: #00ffe7;
+        text-shadow: 0 0 5px #00ffe7, 0 0 10px #00ffe7;
+    }
+
+    /* === BUTTONS === */
+    button[kind="primary"] {
+        background: #00ffe7;
+        color: #000;
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 0 10px #00ffe7;
+        transition: 0.3s ease-in-out;
+    }
+    button[kind="primary"]:hover {
+        background: #00bfa6;
+        box-shadow: 0 0 20px #00ffe7;
+        transform: scale(1.05);
+    }
+
+    /* === METRICS === */
+    .st-emotion-cache-1xarl3l {
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        border: 1px solid rgba(255, 255, 255, 0.18);
+    }
+
+    /* === CARDS & CONTAINERS === */
+    .resource-card {
+        background: rgba(0, 0, 0, 0.4);
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 0 10px rgba(0, 255, 231, 0.2);
+        transition: 0.4s ease-in-out;
+    }
+    .resource-card:hover {
+        box-shadow: 0 0 25px rgba(0, 255, 231, 0.4);
+        transform: translateY(-5px);
+    }
+
+    /* === SIDEBAR === */
+    section[data-testid="stSidebar"] {
+        background: rgba(0, 0, 0, 0.85);
+        color: #00ffe7;
+        border-right: 2px solid #00ffe7;
+    }
+
+    /* === SLIDER === */
+    .stSlider > div[data-baseweb="slider"] {
+        background-color: rgba(255, 255, 255, 0.1);
+    }
+
+    /* === TABS === */
+    .stTabs [role="tab"] {
+        background: #000;
+        color: #00ffe7;
+        border-radius: 10px 10px 0 0;
+        border-bottom: 2px solid #00ffe7;
+    }
+    .stTabs [role="tab"][aria-selected="true"] {
+        background: #00ffe7;
+        color: #000;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(0, 255, 231, 0.3);
+    }
+
+    /* === DATAFRAMES === */
+    .stDataFrame {
+        border: 1px solid #00ffe7;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    /* === FOOTER === */
+    footer {
+        color: #aaa;
+        text-align: center;
+        font-size: 0.8em;
+        padding-top: 10px;
+    }
+    </style>
+    """
+    st.markdown(futuristic_css, unsafe_allow_html=True)
+
 
 # Cache data functions with enhanced error handling
 @st.cache_data(ttl=3600, show_spinner="Fetching cryptocurrency data...")
